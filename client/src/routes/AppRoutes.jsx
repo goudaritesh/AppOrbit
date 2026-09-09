@@ -80,6 +80,7 @@ export const AppRoutes = () => {
         <Route element={<PublicLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/apps" element={<ExplorePage />} />
           <Route path="/apps/:slug" element={<AppDetailsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/developers/:id" element={<DeveloperProfilePage />} />
@@ -88,6 +89,7 @@ export const AppRoutes = () => {
           {/* Authentication Routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
+          <Route path="/register" element={<SignupPage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
