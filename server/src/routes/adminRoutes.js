@@ -38,6 +38,12 @@ import {
   triggerRescan,
 } from '../controllers/adminSecurityController.js';
 import {
+  getAdminSecurityReport,
+  approveApk,
+  rejectApk,
+  suspendApp,
+} from '../controllers/securityTrustController.js';
+import {
   getSubscriptionPlans,
   createSubscriptionPlan,
   updateSubscriptionPlan,
@@ -93,8 +99,12 @@ router.get('/search', globalAdminSearch);
 // ============================================================================
 router.get('/apps', requirePermission(ADMIN_PERMISSIONS.APP_READ), getAdminApps);
 router.get('/apps/:appId', requirePermission(ADMIN_PERMISSIONS.APP_READ), getAdminAppById);
+router.get('/apps/:appId/security', requirePermission(ADMIN_PERMISSIONS.SECURITY_READ), getAdminSecurityReport);
 router.post('/apps/:appId/approve', requirePermission(ADMIN_PERMISSIONS.APP_APPROVE), approveApp);
+router.patch('/apps/:appId/approve', requirePermission(ADMIN_PERMISSIONS.APP_APPROVE), approveApk);
 router.post('/apps/:appId/reject', requirePermission(ADMIN_PERMISSIONS.APP_REJECT), rejectApp);
+router.patch('/apps/:appId/reject', requirePermission(ADMIN_PERMISSIONS.APP_REJECT), rejectApk);
+router.patch('/apps/:appId/suspend', requirePermission(ADMIN_PERMISSIONS.APP_BLOCK), suspendApp);
 router.post('/apps/:appId/request-changes', requirePermission(ADMIN_PERMISSIONS.APP_REVIEW), requestChanges);
 router.post('/apps/:appId/block', requirePermission(ADMIN_PERMISSIONS.APP_BLOCK), blockApp);
 router.post('/apps/:appId/unpublish', requirePermission(ADMIN_PERMISSIONS.APP_APPROVE), unpublishApp);

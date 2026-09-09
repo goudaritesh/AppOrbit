@@ -12,6 +12,7 @@ import { ApkValidationService } from '../services/apk/apkValidationService.js';
 import { ApkMetadataService } from '../services/apk/apkMetadataService.js';
 import { ApkHashService } from '../services/apk/apkHashService.js';
 import { storageService } from '../services/storage/storageService.js';
+import { ApkSecurityPipeline } from '../security/apkSecurityPipeline.js';
 
 /**
  * Resolves target application document and checks ownership
@@ -271,6 +272,10 @@ export const uploadAppApk = async (req, res, next) => {
     // 2. Cryptographic SHA-256 binary hash
     const fileHash = ApkHashService.hashBuffer(buffer);
 
+    // Sprint 4: Layer 2 & 3 Security scan & signature analysis
+    const scanRes = ApkSecurityPipeline.scanApkBuffer(buffer);
+    const sigInfo = ApkSecurityPipeline.extractSignatureInfo(buffer);
+
     // 3. Extract APK AndroidManifest metadata
     let metadata = {};
     try {
@@ -279,7 +284,7 @@ export const uploadAppApk = async (req, res, next) => {
       console.warn('[uploadAppApk] Non-fatal metadata extraction warning:', metaErr.message);
     }
 
-    // 4. Save binary to private storage (never in MongoDB)
+    // 4. Save binary to private storage
     const versionId = crypto.randomUUID();
     const storageKey = storageService.generateStorageKey(
       req.user._id.toString(),
@@ -294,6 +299,13 @@ export const uploadAppApk = async (req, res, next) => {
       contentType: 'application/vnd.android.package-archive',
     });
 
+    // Sprint 4: Move into isolated quarantine storage
+    const quarantineInfo = await ApkSecurityPipeline.moveToQuarantine(
+      app._id,
+      versionId,
+      uploadResult.storagePath
+    );
+
     // 5. Save version metadata in MongoDB
     const versionName = metadata?.versionName || req.body?.versionName || req.body?.version || app.version || '1.0.0';
     const versionCode = metadata?.versionCode || (req.body?.versionCode ? parseInt(req.body.versionCode, 10) : 1);
@@ -303,19 +315,26 @@ export const uploadAppApk = async (req, res, next) => {
       developer: req.user._id,
       versionName,
       versionCode,
-      releaseNotes: req.body?.releaseNotes || 'Uploaded via Sprint 3 Media System',
-      fileName: path.basename(storageKey),
+      releaseNotes: req.body?.releaseNotes || 'Uploaded via Sprint 4 Security Pipeline',
+      fileName: path.basename(quarantineInfo.storageKey || storageKey),
       originalFileName: originalname,
       fileSize: size,
       fileHash,
+      sha256: fileHash,
       storageProvider: uploadResult.storageProvider,
-      storageKey,
-      storagePath: uploadResult.storagePath,
+      storageKey: quarantineInfo.storageKey || storageKey,
+      storagePath: quarantineInfo.storagePath || uploadResult.storagePath,
       contentType: uploadResult.contentType,
       uploadStatus: 'UPLOADED',
       processingStatus: 'COMPLETED',
-      securityStatus: 'PASSED',
-      downloadStatus: 'ENABLED',
+      securityStatus: scanRes.scanStatus === 'SCAN_PASSED' ? 'PASSED' : 'SUSPICIOUS',
+      downloadStatus: 'DISABLED', // Unscanned/Quarantined APK != Public Download!
+      quarantined: true,
+      quarantineReason: 'Awaiting administrative verification and approval',
+      quarantinedAt: new Date(),
+      quarantinedStorageKey: quarantineInfo.storageKey,
+      certificateInfo: sigInfo,
+      signatureStatus: sigInfo.verified ? 'VALID' : 'INVALID',
       isCurrent: true,
       apkMetadata: metadata,
     });
@@ -330,14 +349,19 @@ export const uploadAppApk = async (req, res, next) => {
 
     return res.status(201).json({
       success: true,
-      message: 'APK uploaded and verified successfully',
+      message: 'APK uploaded, validated, and placed in secure quarantine for review',
+      data: versionDoc,
+      version: versionDoc,
       apk: {
         fileName: originalname,
         version: versionName,
         versionCode,
-        storageKey,
+        storageKey: quarantineInfo.storageKey || storageKey,
         size,
         sha256: fileHash,
+        quarantined: true,
+        securityStatus: versionDoc.securityStatus,
+        downloadStatus: versionDoc.downloadStatus,
         uploadedAt: new Date(),
         apkMetadata: {
           packageName: metadata?.packageName || '',
@@ -347,7 +371,6 @@ export const uploadAppApk = async (req, res, next) => {
           targetSdkVersion: metadata?.targetSdkVersion || 34,
         },
       },
-      version: versionDoc,
     });
   } catch (err) {
     if (err.status === 403) {

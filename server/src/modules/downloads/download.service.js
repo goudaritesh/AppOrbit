@@ -51,6 +51,7 @@ export class DownloadService {
 
       const error = new Error(`Application is currently ${app.status.toLowerCase()} and cannot be downloaded.`);
       error.statusCode = 403;
+      error.code = app.status === 'SUSPENDED' ? 'APP_SUSPENDED' : `APPLICATION_${app.status}`;
       throw error;
     }
 
@@ -145,6 +146,7 @@ export class DownloadService {
       sessionToken,
       sessionId: session._id,
       downloadUrl: `/api/downloads/file/${sessionToken}`,
+      expiresIn: 300,
       expiresAt,
       application: {
         id: app._id,

@@ -19,6 +19,7 @@ import {
   Share2,
   Lock,
   MessageSquare,
+  Flag,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -29,6 +30,8 @@ import AppCard from '../../components/apps/AppCard';
 import ScreenshotModal from '../../components/apps/ScreenshotModal';
 import DemoVideoModal from '../../components/apps/DemoVideoModal';
 import DownloadModal from '../../components/downloads/DownloadModal';
+import SecurityStatusCard from '../../components/security/SecurityStatusCard';
+import ReportAppModal from '../../components/apps/ReportAppModal';
 import RatingSummary from '../../components/reviews/RatingSummary';
 import RatingDistribution from '../../components/reviews/RatingDistribution';
 import ReviewForm from '../../components/reviews/ReviewForm';
@@ -74,6 +77,7 @@ export const AppDetailsPage = () => {
   const [isScreenshotModalOpen, setIsScreenshotModalOpen] = useState(false);
   const [selectedScreenshotIndex, setSelectedScreenshotIndex] = useState(0);
   const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+  const [isReportAppModalOpen, setIsReportAppModalOpen] = useState(false);
 
   // Image fallback state
   const [iconError, setIconError] = useState(false);
@@ -739,19 +743,22 @@ export const AppDetailsPage = () => {
             )}
           </div>
 
-          {/* TRUST & INTEGRITY BADGE */}
-          <div className="p-5 rounded-2xl bg-primary/5 border border-primary/20 flex items-start gap-3">
-            <Lock className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" />
-            <div className="flex flex-col gap-1 text-xs">
-              <span className="font-heading font-bold text-content-primary">
-                Signature Security & Trust
-              </span>
-              <p className="text-content-secondary leading-relaxed">
-                This package metadata was submitted with signed cryptographic keys. APK binaries
-                and malware telemetry pipelines will be unlocked in upcoming platform releases.
-              </p>
-            </div>
-          </div>
+          {/* TRUST & SECURITY STATUS CARD (SPRINT 4) */}
+          <SecurityStatusCard
+            appId={app._id}
+            sha256={app.currentVersion?.sha256}
+            developerVerified={isVerified}
+          />
+
+          {/* REPORT APPLICATION ACTION */}
+          <button
+            type="button"
+            onClick={() => setIsReportAppModalOpen(true)}
+            className="flex items-center justify-center gap-2 text-xs font-mono text-content-muted hover:text-accent-rose transition-colors py-2 px-3 rounded-xl border border-white/5 hover:border-accent-rose/30 hover:bg-accent-rose/5"
+          >
+            <Flag className="w-3.5 h-3.5 text-accent-rose" />
+            <span>Report Safety or Policy Concern</span>
+          </button>
         </div>
       </div>
 
@@ -824,6 +831,14 @@ export const AppDetailsPage = () => {
         review={developerReplyModalReview}
         onClose={() => setDeveloperReplyModalReview(null)}
         onSubmit={handleDeveloperReplySubmit}
+      />
+
+      {/* Report Application Modal (Sprint 4 User Reporting) */}
+      <ReportAppModal
+        isOpen={isReportAppModalOpen}
+        onClose={() => setIsReportAppModalOpen(false)}
+        appId={app._id}
+        appName={app.name}
       />
     </div>
   );

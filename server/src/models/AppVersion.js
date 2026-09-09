@@ -57,6 +57,14 @@ const appVersionSchema = new mongoose.Schema(
       lowercase: true,
       index: true,
     },
+    sha256: {
+      type: String,
+      trim: true,
+      lowercase: true,
+      default: function () {
+        return this.fileHash;
+      },
+    },
     hashAlgorithm: {
       type: String,
       default: 'SHA-256',

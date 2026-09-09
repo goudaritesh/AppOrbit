@@ -25,7 +25,12 @@ import {
   deleteScreenshot,
   deleteMedia,
 } from '../controllers/uploadController.js';
-import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
+import {
+  getPublicSecurityStatus,
+  reportApp,
+  secureDownload,
+} from '../controllers/securityTrustController.js';
+import { protect, authorizeRoles, optionalAuth } from '../middleware/authMiddleware.js';
 import { verifyAppOwnership } from '../middleware/ownershipMiddleware.js';
 import {
   createAppValidation,
@@ -150,6 +155,11 @@ router.delete(
   verifyAppOwnership,
   deleteMedia
 );
+
+// Sprint 4: APK Security, Reporting & Secure Download
+router.get('/:id/security', getPublicSecurityStatus);
+router.post('/:id/report', optionalAuth, reportApp);
+router.post('/:id/download', optionalAuth, secureDownload);
 
 // 4. Main Marketplace Discovery (Search, Filter, Sort, Paginate)
 router.get('/', sanitizeQueryParams, validate(appQueryValidation), getApps);

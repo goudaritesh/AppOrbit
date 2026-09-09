@@ -71,7 +71,7 @@ const handleValidationErrorDB = (err) => {
  */
 const sendErrorDev = (err, req, res) => {
   const statusCode = err.statusCode || 500;
-  const errorCode = getErrorCode(statusCode, err.errorCode);
+  const errorCode = getErrorCode(statusCode, err.errorCode || err.code);
 
   res.status(statusCode).json({
     success: false,
@@ -89,7 +89,7 @@ const sendErrorDev = (err, req, res) => {
  */
 const sendErrorProd = (err, req, res) => {
   const statusCode = err.statusCode || 500;
-  const errorCode = getErrorCode(statusCode, err.errorCode);
+  const errorCode = getErrorCode(statusCode, err.errorCode || err.code);
 
   // Operational, trusted error: send message to client
   if (err.isOperational) {
