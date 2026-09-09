@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import crypto from 'crypto';
 import { Payment } from '../../models/Payment.js';
 import { PaymentReceipt } from '../../models/PaymentReceipt.js';
@@ -29,7 +30,13 @@ export class PaymentService {
     const developer = await User.findById(developerId);
     if (!developer) throw new AppError('Developer account not found', 404);
 
-    const plan = await SubscriptionPlan.findById(planId);
+    let plan = null;
+    if (mongoose.isValidObjectId(planId)) {
+      plan = await SubscriptionPlan.findById(planId);
+    }
+    if (!plan && typeof planId === 'string') {
+      plan = await SubscriptionPlan.findOne({ slug: planId.toLowerCase().trim() });
+    }
     if (!plan || !plan.isActive) throw new AppError('Invalid or inactive subscription plan', 400);
 
     if (plan.slug === 'free' || plan.price === 0) {
@@ -67,6 +74,7 @@ export class PaymentService {
         orderId: order.orderId,
         amount: order.amount, // In paise
         currency: order.currency,
+        key: razorpayProvider.getPublicKeyId(),
         keyId: razorpayProvider.getPublicKeyId(),
         planName: plan.name,
         developerName: developer.name,
@@ -91,6 +99,7 @@ export class PaymentService {
       orderId: providerOrderId,
       amount: checkoutData.amount || Math.round(plan.price * 100),
       currency: plan.currency || 'INR',
+      key: razorpayProvider.getPublicKeyId(),
       keyId: razorpayProvider.getPublicKeyId(),
       paymentReference: payment.paymentId,
       paymentId: payment.paymentId,
@@ -234,6 +243,8 @@ export class PaymentService {
     transactionReference,
     screenshotUrl = '',
     notes = '',
+    amount,
+    paymentDate,
   }) {
     if (!transactionReference || !transactionReference.trim()) {
       throw new AppError('Transaction Reference / UTR number is required', 400);
@@ -252,7 +263,13 @@ export class PaymentService {
       );
     }
 
-    const plan = await SubscriptionPlan.findById(planId);
+    let plan = null;
+    if (mongoose.isValidObjectId(planId)) {
+      plan = await SubscriptionPlan.findById(planId);
+    }
+    if (!plan && typeof planId === 'string') {
+      plan = await SubscriptionPlan.findOne({ slug: planId.toLowerCase().trim() });
+    }
     if (!plan || !plan.isActive) throw new AppError('Invalid subscription plan', 400);
 
     const paymentId = `PAY_QR_${Date.now()}_${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
@@ -268,7 +285,11 @@ export class PaymentService {
       status: 'MANUAL_REVIEW',
       transactionReference: transactionReference.trim(),
       screenshotUrl,
-      metadata: { developerNotes: notes },
+      metadata: {
+        developerNotes: notes,
+        paymentDate: paymentDate || new Date(),
+        submittedAmount: amount || plan.price,
+      },
     });
 
     // Notify admins via WebSocket

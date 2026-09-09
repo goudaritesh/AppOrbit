@@ -99,10 +99,36 @@ const subscriptionSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
 
-// Virtual aliases
+// Virtual aliases for Sprint 8 spec compatibility
+subscriptionSchema.virtual('developerId').get(function () {
+  return this.developer;
+});
+
+subscriptionSchema.virtual('planId').get(function () {
+  return this.plan;
+});
+
+subscriptionSchema.virtual('appLimit').get(function () {
+  return this.appsLimit;
+}).set(function (val) {
+  this.appsLimit = val;
+});
+
+subscriptionSchema.virtual('appsUsed').get(function () {
+  return this.applicationsUsed;
+}).set(function (val) {
+  this.applicationsUsed = val;
+});
+
+subscriptionSchema.virtual('paymentId').get(function () {
+  return this.paymentReference;
+});
+
 subscriptionSchema.virtual('applicationLimit').get(function () {
   return this.appsLimit;
 });

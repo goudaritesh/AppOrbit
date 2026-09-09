@@ -51,11 +51,22 @@ export class SubscriptionLimitService {
 
     const limit = sub.appsLimit !== undefined ? sub.appsLimit : (plan?.appLimit ?? 1);
 
-    // Count non-archived applications owned by this developer
-    const used = await App.countDocuments({
-      developer: developerId,
-      status: { $ne: 'ARCHIVED' },
-    });
+    // Count published/approved applications or sub.applicationsUsed
+    let used = sub.applicationsUsed || 0;
+    if (sub.planSlug === 'free') {
+      const publishedCount = await App.countDocuments({
+        developer: developerId,
+        status: { $in: ['PUBLISHED', 'APPROVED'] },
+      });
+      used = Math.max(used, publishedCount);
+    } else {
+      const publishedInPeriod = await App.countDocuments({
+        developer: developerId,
+        status: { $in: ['PUBLISHED', 'APPROVED'] },
+        ...(sub.startDate ? { createdAt: { $gte: sub.startDate } } : {}),
+      });
+      used = Math.max(used, publishedInPeriod);
+    }
 
     const remaining = Math.max(0, limit - used);
     const allowed = used < limit;
@@ -70,7 +81,7 @@ export class SubscriptionLimitService {
       resetDate: sub.usageResetDate || sub.endDate,
       reason: allowed
         ? undefined
-        : `Application quota limit reached (${used}/${limit}). Please upgrade your plan to publish more applications.`,
+        : 'Your monthly app publishing limit has been reached.',
     };
   }
 
@@ -113,6 +124,8 @@ export class SubscriptionLimitService {
   static async getUsageTelemetry(developerId) {
     const check = await this.checkAppCreationLimit(developerId);
     return {
+      allowed: check.allowed,
+      reason: check.reason,
       plan: check.planName,
       planName: check.planName,
       planSlug: check.planSlug,

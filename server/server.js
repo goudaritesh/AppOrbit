@@ -1,8 +1,5 @@
-import dotenv from 'dotenv';
+import 'dotenv/config';
 import { validateEnv } from './src/config/envValidator.js';
-
-// Load environment variables before anything else
-dotenv.config();
 
 // Validate critical environment invariants at boot
 validateEnv();

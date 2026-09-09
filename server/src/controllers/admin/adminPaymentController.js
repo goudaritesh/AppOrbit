@@ -119,6 +119,20 @@ export const verifyPayment = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Payment record not found.' });
     }
 
+    // Prevent duplicate approval or state collision
+    if (payment.status === 'SUCCESS') {
+      return res.status(400).json({
+        success: false,
+        message: 'This payment has already been approved and processed.',
+      });
+    }
+    if (payment.status === 'FAILED' && decision === 'REJECTED') {
+      return res.status(400).json({
+        success: false,
+        message: 'This payment has already been rejected.',
+      });
+    }
+
     const previousStatus = payment.status;
 
     if (decision === 'APPROVED') {
@@ -220,8 +234,20 @@ export const verifyPayment = async (req, res, next) => {
   }
 };
 
+export const approvePayment = async (req, res, next) => {
+  req.body.decision = 'APPROVED';
+  return verifyPayment(req, res, next);
+};
+
+export const rejectPayment = async (req, res, next) => {
+  req.body.decision = 'REJECTED';
+  return verifyPayment(req, res, next);
+};
+
 export default {
   getAdminPayments,
   getAdminPaymentById,
   verifyPayment,
+  approvePayment,
+  rejectPayment,
 };

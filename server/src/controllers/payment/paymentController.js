@@ -44,15 +44,12 @@ export const createPaymentOrder = async (req, res, next) => {
 export const verifyPayment = async (req, res, next) => {
   try {
     const developerId = req.user._id;
-    const {
-      paymentId,
-      razorpay_order_id,
-      razorpay_payment_id,
-      razorpay_signature,
-      paymentReference,
-    } = req.body;
+    const orderId = req.body.razorpay_order_id || req.body.razorpayOrderId || req.body.orderId;
+    const paymentIdVal = req.body.razorpay_payment_id || req.body.razorpayPaymentId || req.body.paymentId;
+    const signature = req.body.razorpay_signature || req.body.razorpaySignature || req.body.signature;
+    const ref = req.body.paymentReference || req.body.paymentId;
 
-    if (!razorpay_payment_id || !razorpay_signature) {
+    if (!paymentIdVal || !signature) {
       return next(
         new AppError('Missing required payment credentials (paymentId, signature)', 400)
       );
@@ -60,12 +57,13 @@ export const verifyPayment = async (req, res, next) => {
 
     const result = await PaymentService.verifyPayment({
       developerId,
-      paymentId: paymentId || paymentReference,
-      providerOrderId: razorpay_order_id,
-      providerPaymentId: razorpay_payment_id,
-      razorpayOrderId: razorpay_order_id,
-      razorpayPaymentId: razorpay_payment_id,
-      razorpaySignature: razorpay_signature,
+      paymentId: ref,
+      paymentReference: ref,
+      providerOrderId: orderId,
+      providerPaymentId: paymentIdVal,
+      razorpayOrderId: orderId,
+      razorpayPaymentId: paymentIdVal,
+      razorpaySignature: signature,
     });
 
     return res.status(200).json(result);
@@ -81,24 +79,28 @@ export const verifyPayment = async (req, res, next) => {
 export const submitManualPayment = async (req, res, next) => {
   try {
     const developerId = req.user._id;
-    const { planId, transactionId, screenshotUrl, notes } = req.body;
+    const { planId, transactionId, transactionReference, utr, screenshotUrl, screenshot, notes, amount, paymentDate, date } = req.body;
+    const ref = transactionId || transactionReference || utr;
 
-    if (!planId || !transactionId) {
+    if (!planId || !ref) {
       return next(new AppError('Plan ID and Transaction ID (UTR) are required.', 400));
     }
 
     const payment = await PaymentService.submitManualPaymentProof({
       developerId,
       planId,
-      transactionReference: transactionId,
-      screenshotUrl,
-      notes,
+      transactionReference: ref,
+      screenshotUrl: screenshotUrl || screenshot || '',
+      notes: notes || '',
+      amount,
+      paymentDate: paymentDate || date || new Date(),
     });
 
     return res.status(201).json({
       success: true,
       message: 'Manual payment submitted successfully. Your payment is under administrative review.',
       data: { payment },
+      payment,
     });
   } catch (err) {
     next(err);

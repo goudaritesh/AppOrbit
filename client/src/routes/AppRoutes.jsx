@@ -100,6 +100,7 @@ export const AppRoutes = () => {
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/security" element={<SecurityPage />} />
+          <Route path="/pricing" element={<DeveloperPricingPage />} />
 
           {/* Authentication Routes */}
           <Route path="/login" element={<LoginPage />} />
@@ -206,6 +207,7 @@ export const AppRoutes = () => {
           <Route path="developers/:developerId" element={<AdminDeveloperDetailPage />} />
           <Route path="users" element={<AdminUsersPage />} />
           <Route path="subscriptions" element={<AdminSubscriptionsPage />} />
+          <Route path="plans" element={<AdminSubscriptionsPage />} />
           <Route path="payments" element={<AdminPaymentsPage />} />
           <Route path="support" element={<AdminSupportPage />} />
           <Route path="support/:ticketId" element={<AdminSupportDetailPage />} />

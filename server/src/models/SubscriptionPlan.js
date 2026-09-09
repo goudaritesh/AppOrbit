@@ -60,8 +60,17 @@ const subscriptionPlanSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Virtual alias for Sprint 8 spec compatibility
+subscriptionPlanSchema.virtual('billingCycle').get(function () {
+  return this.billingPeriod;
+}).set(function (val) {
+  this.billingPeriod = val;
+});
 
 export const DEFAULT_PLANS = [
   {
@@ -116,10 +125,10 @@ export const DEFAULT_PLANS = [
     slug: 'diamond',
     price: 999,
     currency: 'INR',
-    appLimit: 25,
+    appLimit: 20,
     billingPeriod: 'MONTHLY',
     features: [
-      'Up to 25 Applications',
+      'Up to 20 Published Applications',
       'Enterprise SLA & Fast-Track Review',
       'Custom Branding & Featured Placement',
       'Dedicated Account Manager',
@@ -131,4 +140,5 @@ export const DEFAULT_PLANS = [
 ];
 
 export const SubscriptionPlan = mongoose.model('SubscriptionPlan', subscriptionPlanSchema);
+export const Plan = SubscriptionPlan;
 export default SubscriptionPlan;

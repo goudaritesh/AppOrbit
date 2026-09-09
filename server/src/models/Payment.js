@@ -128,8 +128,49 @@ const paymentSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Virtual aliases for Sprint 8 spec compatibility
+paymentSchema.virtual('developerId').get(function () {
+  return this.developer;
+});
+
+paymentSchema.virtual('subscriptionId').get(function () {
+  return this.subscription;
+});
+
+paymentSchema.virtual('planId').get(function () {
+  return this.plan;
+});
+
+paymentSchema.virtual('paymentMethod').get(function () {
+  return this.method;
+}).set(function (val) {
+  this.method = val;
+});
+
+paymentSchema.virtual('paymentGateway').get(function () {
+  return this.provider;
+}).set(function (val) {
+  this.provider = val;
+});
+
+paymentSchema.virtual('gatewayOrderId').get(function () {
+  return this.providerOrderId || this.razorpayOrderId;
+}).set(function (val) {
+  this.providerOrderId = val;
+  this.razorpayOrderId = val;
+});
+
+paymentSchema.virtual('gatewayPaymentId').get(function () {
+  return this.providerPaymentId || this.razorpayPaymentId;
+}).set(function (val) {
+  this.providerPaymentId = val;
+  this.razorpayPaymentId = val;
+});
 
 paymentSchema.index({ createdAt: -1, status: 1 });
 paymentSchema.index({ developer: 1, createdAt: -1 });

@@ -203,6 +203,18 @@ export const DeveloperSubscriptionPage = () => {
                 </span>
               </div>
 
+              {/* Slot Warning Banner */}
+              {remainingApps <= 1 && (
+                <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center gap-3 text-xs text-amber-300 mb-4">
+                  <AlertTriangle className="w-4 h-4 shrink-0 text-amber-400" />
+                  <span>
+                    {remainingApps === 0
+                      ? '⚠️ You have reached your app publishing limit. Please upgrade your plan to publish more apps.'
+                      : '⚠️ You have only 1 publishing slot remaining.'}
+                  </span>
+                </div>
+              )}
+
               {/* Big Metric Display */}
               <div className="grid grid-cols-3 gap-4 p-5 rounded-2xl bg-surface border border-white/5 text-center mb-6">
                 <div>

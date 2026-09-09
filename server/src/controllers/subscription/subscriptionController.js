@@ -1,4 +1,4 @@
-import { SubscriptionPlan } from '../../models/SubscriptionPlan.js';
+import { SubscriptionPlan, DEFAULT_PLANS } from '../../models/SubscriptionPlan.js';
 import { Subscription } from '../../models/Subscription.js';
 import { SubscriptionService } from '../../services/subscription/subscriptionService.js';
 import { SubscriptionLimitService } from '../../services/admin/subscriptionLimitService.js';
@@ -15,7 +15,17 @@ import AppError from '../../utils/AppError.js';
  */
 export const getPublicPlans = async (req, res, next) => {
   try {
-    const plans = await SubscriptionPlan.find({ isActive: true }).sort({ displayOrder: 1 });
+    let plans = await SubscriptionPlan.find({ isActive: true }).sort({ displayOrder: 1 });
+    if (plans.length === 0) {
+      await SubscriptionPlan.insertMany(DEFAULT_PLANS);
+      plans = await SubscriptionPlan.find({ isActive: true }).sort({ displayOrder: 1 });
+    } else {
+      const diamond = plans.find((p) => p.slug === 'diamond');
+      if (diamond && diamond.appLimit !== 20) {
+        diamond.appLimit = 20;
+        await diamond.save();
+      }
+    }
     return res.status(200).json({
       success: true,
       data: { plans },

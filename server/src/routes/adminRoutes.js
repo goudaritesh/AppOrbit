@@ -49,6 +49,7 @@ import {
   getSubscriptionPlans,
   createSubscriptionPlan,
   updateSubscriptionPlan,
+  deleteSubscriptionPlan,
   getDeveloperSubscriptions,
   manualUpdateSubscription,
 } from '../controllers/admin/adminSubscriptionController.js';
@@ -56,6 +57,8 @@ import {
   getAdminPayments,
   getAdminPaymentById,
   verifyPayment,
+  approvePayment,
+  rejectPayment,
 } from '../controllers/admin/adminPaymentController.js';
 import {
   getSupportTickets,
@@ -144,6 +147,12 @@ router.post('/security/apps/:appId/versions/:versionId/rescan', requirePermissio
 // ============================================================================
 // 7. SUBSCRIPTIONS & PLANS
 // ============================================================================
+router.get('/plans', requirePermission(ADMIN_PERMISSIONS.SUBSCRIPTION_MANAGE), getSubscriptionPlans);
+router.post('/plans', requirePermission(ADMIN_PERMISSIONS.SUBSCRIPTION_MANAGE), createSubscriptionPlan);
+router.patch('/plans/:planId', requirePermission(ADMIN_PERMISSIONS.SUBSCRIPTION_MANAGE), updateSubscriptionPlan);
+router.put('/plans/:planId', requirePermission(ADMIN_PERMISSIONS.SUBSCRIPTION_MANAGE), updateSubscriptionPlan);
+router.delete('/plans/:planId', requirePermission(ADMIN_PERMISSIONS.SUBSCRIPTION_MANAGE), deleteSubscriptionPlan);
+
 router.get('/subscriptions/plans', requirePermission(ADMIN_PERMISSIONS.SUBSCRIPTION_MANAGE), getSubscriptionPlans);
 router.post('/subscriptions/plans', requirePermission(ADMIN_PERMISSIONS.SUBSCRIPTION_MANAGE), createSubscriptionPlan);
 router.put('/subscriptions/plans/:planId', requirePermission(ADMIN_PERMISSIONS.SUBSCRIPTION_MANAGE), updateSubscriptionPlan);
@@ -157,6 +166,8 @@ router.get('/payments', requirePermission(ADMIN_PERMISSIONS.PAYMENT_READ), getAd
 router.get('/payments/:paymentId', requirePermission(ADMIN_PERMISSIONS.PAYMENT_READ), getAdminPaymentById);
 router.post('/payments/:paymentId/verify', requirePermission(ADMIN_PERMISSIONS.PAYMENT_VERIFY), verifyPayment);
 router.patch('/payments/:paymentId/verify', requirePermission(ADMIN_PERMISSIONS.PAYMENT_VERIFY), verifyPayment);
+router.patch('/payments/:paymentId/approve', requirePermission(ADMIN_PERMISSIONS.PAYMENT_VERIFY), approvePayment);
+router.patch('/payments/:paymentId/reject', requirePermission(ADMIN_PERMISSIONS.PAYMENT_VERIFY), rejectPayment);
 
 // ============================================================================
 // 9. SUPPORT TICKETING SYSTEM

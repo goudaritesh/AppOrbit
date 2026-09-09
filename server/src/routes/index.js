@@ -8,6 +8,7 @@ import developerPublicRoutes from './developerPublicRoutes.js';
 import adminSecurityRoutes from './adminSecurityRoutes.js';
 import adminRoutes from './adminRoutes.js';
 import subscriptionRoutes from './subscriptionRoutes.js';
+import { getPublicPlans } from '../controllers/subscription/subscriptionController.js';
 import paymentRoutes from './paymentRoutes.js';
 import webhookRoutes from './webhookRoutes.js';
 import notificationRoutes from './notificationRoutes.js';
@@ -40,6 +41,7 @@ router.use('/developer/payments', paymentRoutes);
 router.use('/developer', developerAnalyticsRouter);
 
 // Phase 8 Subscriptions & Payments Primary Endpoints
+router.get('/plans', getPublicPlans);
 router.use('/subscription', subscriptionRoutes);
 router.use('/subscriptions', subscriptionRoutes);
 router.use('/payments', paymentRoutes);

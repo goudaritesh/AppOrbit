@@ -241,10 +241,45 @@ export const manualUpdateSubscription = async (req, res, next) => {
   }
 };
 
+/**
+ * DELETE /api/admin/plans/:planId
+ * Deactivate or remove subscription plan
+ */
+export const deleteSubscriptionPlan = async (req, res, next) => {
+  try {
+    const { planId, id } = req.params;
+    const targetId = planId || id;
+    const plan = await SubscriptionPlan.findById(targetId);
+    if (!plan) {
+      return res.status(404).json({ success: false, message: 'Plan not found.' });
+    }
+
+    plan.isActive = false;
+    await plan.save();
+
+    await AuditLogService.log({
+      req,
+      action: 'SUBSCRIPTION_PLAN_DEACTIVATED',
+      resourceType: 'SUBSCRIPTION',
+      resourceId: plan._id,
+      newState: { isActive: false },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Subscription plan deactivated successfully.',
+      data: { plan },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default {
   getSubscriptionPlans,
   createSubscriptionPlan,
   updateSubscriptionPlan,
+  deleteSubscriptionPlan,
   getDeveloperSubscriptions,
   manualUpdateSubscription,
 };
