@@ -5,6 +5,7 @@ import { SecurityReport } from '../../models/SecurityReport.js';
 import { Subscription } from '../../models/Subscription.js';
 import { Payment } from '../../models/Payment.js';
 import { SupportTicket } from '../../models/SupportTicket.js';
+import AppReport from '../../models/AppReport.js';
 
 /**
  * Admin Dashboard Controller (Phase 7 Production Implementation)
@@ -31,6 +32,8 @@ export const getDashboardStats = async (req, res, next) => {
       openTickets,
       pendingSecurityReports,
       quarantinedVersions,
+      totalReports,
+      openReports,
       downloadAggregate,
       revenueAggregate,
     ] = await Promise.all([
@@ -47,6 +50,8 @@ export const getDashboardStats = async (req, res, next) => {
       SupportTicket.countDocuments({ status: { $in: ['OPEN', 'IN_PROGRESS', 'WAITING_FOR_USER'] } }),
       SecurityReport.countDocuments({ manualReviewRequired: true, status: { $ne: 'PASSED' } }),
       AppVersion.countDocuments({ quarantined: true }),
+      AppReport.countDocuments({}),
+      AppReport.countDocuments({ status: { $in: ['OPEN', 'UNDER_REVIEW'] } }),
       App.aggregate([
         { $match: { status: 'PUBLISHED' } },
         { $group: { _id: null, totalDownloads: { $sum: '$downloadCount' } } },
@@ -59,10 +64,20 @@ export const getDashboardStats = async (req, res, next) => {
 
     const totalDownloads = downloadAggregate[0]?.totalDownloads || 0;
     const totalRevenue = revenueAggregate[0]?.totalRevenue || 0;
+    const securityAlerts = quarantinedVersions || pendingSecurityReports;
 
     return res.status(200).json({
       success: true,
       data: {
+        totalDevelopers,
+        totalUsers,
+        totalApplications: totalApps,
+        publishedApps,
+        pendingReviews: pendingReviewApps,
+        rejectedApps,
+        securityAlerts,
+        totalDownloads,
+        totalReports,
         users: {
           total: totalUsers,
           active: totalUsers,
@@ -92,6 +107,11 @@ export const getDashboardStats = async (req, res, next) => {
         security: {
           pendingReviews: pendingSecurityReports,
           quarantined: quarantinedVersions,
+          alerts: securityAlerts,
+        },
+        reports: {
+          total: totalReports,
+          open: openReports,
         },
         support: {
           openTickets,

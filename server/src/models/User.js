@@ -91,6 +91,20 @@ const userSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    isVerified: {
+      type: Boolean,
+      default: false,
+    },
+    verificationStatus: {
+      type: String,
+      enum: ['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED'],
+      default: 'UNVERIFIED',
+    },
+    verificationLevel: {
+      type: String,
+      enum: ['UNVERIFIED', 'EMAIL_VERIFIED', 'VERIFIED', 'TRUSTED'],
+      default: 'UNVERIFIED',
+    },
     profileImage: {
       type: String,
       default: '',

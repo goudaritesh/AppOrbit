@@ -192,6 +192,13 @@ const appSchema = new mongoose.Schema(
       reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
       reviewedAt: { type: Date, default: null },
     },
+    review: {
+      status: { type: String, default: null },
+      reason: { type: String, default: '' },
+      comment: { type: String, default: '' },
+      reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+      reviewedAt: { type: Date, default: null },
+    },
     visibility: {
       type: String,
       enum: {

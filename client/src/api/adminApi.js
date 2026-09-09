@@ -14,14 +14,20 @@ export const adminApi = {
   getApps: (params = {}) => apiClient.get('/admin/apps', { params }),
   getAppById: (appId) => apiClient.get(`/admin/apps/${appId}`),
   approveApp: (appId, data) => apiClient.post(`/admin/apps/${appId}/approve`, data),
+  patchApproveApp: (appId, data) => apiClient.patch(`/admin/apps/${appId}/approve`, data),
   rejectApp: (appId, data) => apiClient.post(`/admin/apps/${appId}/reject`, data),
+  patchRejectApp: (appId, data) => apiClient.patch(`/admin/apps/${appId}/reject`, data),
   requestChanges: (appId, data) => apiClient.post(`/admin/apps/${appId}/request-changes`, data),
+  patchRequestChanges: (appId, data) => apiClient.patch(`/admin/apps/${appId}/request-changes`, data),
+  suspendApp: (appId, data) => apiClient.patch(`/admin/apps/${appId}/suspend`, data),
   blockApp: (appId, data) => apiClient.post(`/admin/apps/${appId}/block`, data),
   unpublishApp: (appId, data) => apiClient.post(`/admin/apps/${appId}/unpublish`, data),
 
   // Developer Management
   getDevelopers: (params = {}) => apiClient.get('/admin/developers', { params }),
   getDeveloperById: (developerId) => apiClient.get(`/admin/developers/${developerId}`),
+  updateDeveloperStatus: (developerId, data) => apiClient.patch(`/admin/developers/${developerId}/status`, data),
+  updateDeveloperPlan: (developerId, data) => apiClient.patch(`/admin/developers/${developerId}/plan`, data),
   suspendDeveloper: (developerId, data) => apiClient.post(`/admin/developers/${developerId}/suspend`, data),
   restoreDeveloper: (developerId) => apiClient.post(`/admin/developers/${developerId}/restore`),
   restrictDeveloper: (developerId, data) => apiClient.post(`/admin/developers/${developerId}/restrict`, data),
@@ -49,6 +55,7 @@ export const adminApi = {
   getPayments: (params = {}) => apiClient.get('/admin/payments', { params }),
   getPaymentById: (paymentId) => apiClient.get(`/admin/payments/${paymentId}`),
   verifyPayment: (paymentId, data) => apiClient.post(`/admin/payments/${paymentId}/verify`, data),
+  patchVerifyPayment: (paymentId, data) => apiClient.patch(`/admin/payments/${paymentId}/verify`, data),
 
   // Support Ticketing
   getSupportTickets: (params = {}) => apiClient.get('/admin/support', { params }),
@@ -61,6 +68,7 @@ export const adminApi = {
   getReports: (params = {}) => apiClient.get('/admin/reports', { params }),
   getReportById: (reportId) => apiClient.get(`/admin/reports/${reportId}`),
   resolveReport: (reportId, data) => apiClient.post(`/admin/reports/${reportId}/resolve`, data),
+  patchReportStatus: (reportId, data) => apiClient.patch(`/admin/reports/${reportId}`, data),
 
   // Notifications
   getNotifications: (params = {}) => apiClient.get('/admin/notifications', { params }),

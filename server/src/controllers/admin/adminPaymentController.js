@@ -91,12 +91,18 @@ export const getAdminPaymentById = async (req, res, next) => {
  */
 export const verifyPayment = async (req, res, next) => {
   try {
-    const { decision, reason = '' } = req.body;
+    const rawDecision = (req.body.decision || req.body.status || '').toUpperCase();
+    const reason = req.body.reason || '';
 
-    if (!['APPROVED', 'REJECTED'].includes(decision)) {
+    let decision = 'APPROVED';
+    if (['REJECTED', 'FAILED'].includes(rawDecision)) {
+      decision = 'REJECTED';
+    } else if (['APPROVED', 'PAID', 'SUCCESS'].includes(rawDecision)) {
+      decision = 'APPROVED';
+    } else {
       return res.status(400).json({
         success: false,
-        message: 'Decision must be either APPROVED or REJECTED.',
+        message: 'Decision or status must be APPROVED/PAID or REJECTED/FAILED.',
       });
     }
 
@@ -107,7 +113,8 @@ export const verifyPayment = async (req, res, next) => {
       });
     }
 
-    const payment = await Payment.findById(req.params.paymentId).populate('plan');
+    const targetId = req.params.paymentId || req.params.id;
+    const payment = await Payment.findById(targetId).populate('plan');
     if (!payment) {
       return res.status(404).json({ success: false, message: 'Payment record not found.' });
     }

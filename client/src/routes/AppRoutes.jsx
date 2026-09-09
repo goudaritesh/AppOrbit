@@ -181,7 +181,9 @@ export const AppRoutes = () => {
           <Route index element={<AdminDashboardPage />} />
           <Route path="dashboard" element={<AdminDashboardPage />} />
           <Route path="apps" element={<AdminAppsPage />} />
+          <Route path="apps/review" element={<AdminAppsPage />} />
           <Route path="apps/:appId" element={<AdminAppReviewPage />} />
+          <Route path="apps/:appId/review" element={<AdminAppReviewPage />} />
           <Route path="security" element={<AdminSecurityPage />} />
           <Route path="security/:reportId" element={<AdminSecurityDetailPage />} />
           <Route path="developers" element={<AdminDevelopersPage />} />

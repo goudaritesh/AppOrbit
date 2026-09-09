@@ -32,12 +32,13 @@ export const AdminAppReviewPage = () => {
   const [versions, setVersions] = useState([]);
   const [securityReports, setSecurityReports] = useState([]);
   const [reviewHistory, setReviewHistory] = useState([]);
+  const [approvalReadiness, setApprovalReadiness] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
 
   // Modals state
-  const [modalType, setModalType] = useState(null); // 'APPROVE' | 'REJECT' | 'CHANGES' | 'BLOCK'
+  const [modalType, setModalType] = useState(null); // 'APPROVE' | 'REJECT' | 'CHANGES' | 'SUSPEND' | 'BLOCK'
 
   const fetchAppDetails = async () => {
     try {
@@ -48,6 +49,7 @@ export const AdminAppReviewPage = () => {
       setVersions(data.versions || []);
       setSecurityReports(data.securityReports || []);
       setReviewHistory(data.reviewHistory || []);
+      setApprovalReadiness(data.approvalReadiness || null);
     } catch (err) {
       console.error('Failed to load application details:', err);
     } finally {
@@ -61,6 +63,13 @@ export const AdminAppReviewPage = () => {
 
   const handleApprove = async () => {
     try {
+      if (approvalReadiness && !approvalReadiness.canApprove) {
+        alert(
+          'Approval Blocked: Application fails mandatory requirements:\n• ' +
+            approvalReadiness.missingRequirements.join('\n• ')
+        );
+        return;
+      }
       setActionLoading(true);
       await adminApi.approveApp(appId, { publishImmediately: true });
       await fetchAppDetails();
@@ -79,6 +88,8 @@ export const AdminAppReviewPage = () => {
         await adminApi.rejectApp(appId, params);
       } else if (modalType === 'CHANGES') {
         await adminApi.requestChanges(appId, params);
+      } else if (modalType === 'SUSPEND') {
+        await adminApi.suspendApp(appId, params);
       } else if (modalType === 'BLOCK') {
         await adminApi.blockApp(appId, params);
       }
@@ -152,10 +163,20 @@ export const AdminAppReviewPage = () => {
           {app.status !== 'PUBLISHED' && app.status !== 'APPROVED' && (
             <button
               onClick={() => setModalType('APPROVE')}
-              className="px-3.5 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+              disabled={approvalReadiness && !approvalReadiness.canApprove}
+              title={
+                approvalReadiness && !approvalReadiness.canApprove
+                  ? `Approval Blocked: ${approvalReadiness.missingRequirements?.join(', ')}`
+                  : 'Approve application and publish to marketplace'
+              }
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+                approvalReadiness && !approvalReadiness.canApprove
+                  ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 cursor-not-allowed opacity-60'
+                  : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+              }`}
             >
               <CheckCircle2 className="w-4 h-4" />
-              <span>Approve & Publish</span>
+              <span>{approvalReadiness && !approvalReadiness.canApprove ? 'Approval Blocked' : 'Approve & Publish'}</span>
             </button>
           )}
 
@@ -175,6 +196,15 @@ export const AdminAppReviewPage = () => {
             <span>Reject</span>
           </button>
 
+          {app.status !== 'SUSPENDED' && (
+            <button
+              onClick={() => setModalType('SUSPEND')}
+              className="px-3.5 py-2 rounded-xl bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-400 text-xs font-semibold flex items-center gap-1.5 transition-colors"
+            >
+              <span>⏸ Suspend</span>
+            </button>
+          )}
+
           {app.status !== 'BLOCKED' && (
             <button
               onClick={() => setModalType('BLOCK')}
@@ -185,6 +215,69 @@ export const AdminAppReviewPage = () => {
             </button>
           )}
         </div>
+      </div>
+
+      {/* 7-Point Mandatory Approval Gate Checklist (Sprint 5) */}
+      <div className="glass-panel p-5 rounded-2xl border border-white/10 space-y-3 bg-surface/50">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-white/10 pb-3">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-5 h-5 text-primary" />
+            <h3 className="font-heading font-bold text-sm text-content-primary">
+              7-Point Mandatory Platform Approval Gate
+            </h3>
+          </div>
+          {approvalReadiness?.canApprove ? (
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5" /> All Requirements Met • Ready for Publication
+            </span>
+          ) : (
+            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30 flex items-center gap-1.5">
+              <XCircle className="w-3.5 h-3.5" /> Approval Blocked ({approvalReadiness?.missingRequirements?.length || 0} Missing Requirements)
+            </span>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 pt-1">
+          {[
+            { label: '1. Developer Account Active', ok: approvalReadiness?.rules?.developerActive },
+            { label: '2. Required Details Completed', ok: approvalReadiness?.rules?.detailsCompleted },
+            { label: '3. App Icon Uploaded', ok: approvalReadiness?.rules?.iconUploaded },
+            { label: '4. APK Uploaded', ok: approvalReadiness?.rules?.apkUploaded },
+            { label: '5. APK Validated', ok: approvalReadiness?.rules?.apkValidated },
+            { label: '6. Security Scan Completed', ok: approvalReadiness?.rules?.securityProcessingCompleted },
+            { label: '7. No Blocking Alerts', ok: approvalReadiness?.rules?.noBlockingAlerts },
+          ].map((rule, idx) => (
+            <div
+              key={idx}
+              className={`p-2.5 rounded-xl border flex items-center gap-2.5 text-xs ${
+                rule.ok
+                  ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-300'
+                  : 'bg-rose-500/5 border-rose-500/20 text-rose-400'
+              }`}
+            >
+              {rule.ok ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+              ) : (
+                <XCircle className="w-4 h-4 text-rose-400 shrink-0" />
+              )}
+              <span className="font-medium">{rule.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {approvalReadiness && !approvalReadiness.canApprove && (
+          <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/20 text-xs text-rose-300 flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-rose-400 mt-0.5" />
+            <div>
+              <span className="font-semibold block">Cannot Approve Application — Missing Requirements:</span>
+              <ul className="list-disc list-inside mt-1 space-y-0.5 text-rose-200">
+                {approvalReadiness.missingRequirements?.map((req, i) => (
+                  <li key={i}>{req}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Tabs */}
@@ -553,7 +646,16 @@ export const AdminAppReviewPage = () => {
         confirmText="Reject Application"
         confirmVariant="danger"
         showCategory={true}
-        categories={['CONTENT', 'SECURITY', 'POLICY', 'TECHNICAL', 'DUPLICATE', 'PAYMENT', 'OTHER']}
+        categories={[
+          'Invalid Application Information',
+          'APK Validation Failed',
+          'Security Risk',
+          'Misleading Content',
+          'Copyright Issue',
+          'Incomplete Information',
+          'Platform Policy Violation',
+          'Other',
+        ]}
         loading={actionLoading}
       />
 
@@ -565,6 +667,25 @@ export const AdminAppReviewPage = () => {
         description="Provide actionable revision instructions for the developer."
         confirmText="Submit Request"
         confirmVariant="warning"
+        loading={actionLoading}
+      />
+
+      <ActionReasonModal
+        isOpen={modalType === 'SUSPEND'}
+        onClose={() => setModalType(null)}
+        onSubmit={handleActionSubmit}
+        title="Suspend Application"
+        description="Temporarily removes application from marketplace, disables downloads, and flags for investigation."
+        confirmText="Suspend Application"
+        confirmVariant="danger"
+        showCategory={true}
+        categories={[
+          'Suspicious Activity',
+          'User Safety Complaint',
+          'Security Investigation',
+          'Platform Policy Violation',
+          'Other',
+        ]}
         loading={actionLoading}
       />
 

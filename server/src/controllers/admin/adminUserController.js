@@ -61,7 +61,8 @@ export const getAdminUsers = async (req, res, next) => {
  */
 export const getAdminUserById = async (req, res, next) => {
   try {
-    const user = await User.findOne({ _id: req.params.userId, role: 'USER' }).select('-password');
+    const targetId = req.params.userId || req.params.id;
+    const user = await User.findOne({ _id: targetId, role: 'USER' }).select('-password');
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }
@@ -76,7 +77,7 @@ export const getAdminUserById = async (req, res, next) => {
 };
 
 /**
- * POST /api/admin/users/:userId/status
+ * POST /api/admin/users/:userId/status or PATCH /api/v1/admin/users/:id/status
  * Update user account status (ACTIVE, SUSPENDED, BANNED) with reason
  */
 export const updateUserStatus = async (req, res, next) => {
@@ -87,7 +88,8 @@ export const updateUserStatus = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid status specified.' });
     }
 
-    const user = await User.findOne({ _id: req.params.userId, role: 'USER' });
+    const targetId = req.params.userId || req.params.id;
+    const user = await User.findOne({ _id: targetId, role: 'USER' });
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found.' });
     }

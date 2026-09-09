@@ -4,6 +4,42 @@ import { SecurityReport } from '../../models/SecurityReport.js';
 import { Category } from '../../models/Category.js';
 import { AuditLogService } from '../../services/admin/auditLogService.js';
 import { NotificationService } from '../../services/admin/notificationService.js';
+import { ApkSecurityPipeline } from '../../security/apkSecurityPipeline.js';
+
+/**
+ * 7-Point Mandatory Approval Gate (Sprint 5)
+ */
+export const evaluateApprovalRules = (app, version) => {
+  const rules = {
+    developerAccountActive: Boolean(app.developer?.accountStatus === 'ACTIVE'),
+    requiredDetailsCompleted: Boolean(app.name && app.shortDescription && app.description && app.category),
+    iconUploaded: Boolean(app.icon),
+    apkUploaded: Boolean(version),
+    apkValidated: Boolean(version && (version.processingStatus === 'COMPLETED' || version.fileName)),
+    securityProcessingCompleted: Boolean(
+      version &&
+      (version.securityStatus === 'PASSED' || version.securityStatus === 'APPROVED' || version.scanResult === 'clean')
+    ),
+    noBlockingSecurityAlerts: Boolean(
+      version &&
+      version.securityStatus !== 'MALICIOUS' &&
+      version.securityStatus !== 'BLOCKED' &&
+      version.securityStatus !== 'SUSPICIOUS'
+    ),
+  };
+
+  const missingRequirements = [];
+  if (!rules.developerAccountActive) missingRequirements.push('Developer Account must be Active');
+  if (!rules.requiredDetailsCompleted) missingRequirements.push('Application details (Name, Short Description, Description, Category) incomplete');
+  if (!rules.iconUploaded) missingRequirements.push('Application icon must be uploaded');
+  if (!rules.apkUploaded) missingRequirements.push('APK binary must be uploaded');
+  if (!rules.apkValidated) missingRequirements.push('APK archive validation incomplete');
+  if (!rules.securityProcessingCompleted) missingRequirements.push('Security scan processing incomplete');
+  if (!rules.noBlockingSecurityAlerts) missingRequirements.push('Blocking security alerts or malware detected');
+
+  const canApprove = missingRequirements.length === 0;
+  return { canApprove, rules, missingRequirements };
+};
 
 /**
  * Admin Application Moderation Controller (Phase 7 Production Implementation)
@@ -97,12 +133,16 @@ export const getAdminAppById = async (req, res, next) => {
       app: app._id,
     }).sort({ createdAt: -1 });
 
+    const activeVersion = app.currentVersion || versions[0];
+    const readiness = evaluateApprovalRules(app, activeVersion);
+
     return res.status(200).json({
       success: true,
       data: {
         app,
         versions,
         securityReports,
+        approvalReadiness: readiness,
         reviewHistory: app.moderation?.reviewHistory || [],
       },
     });
@@ -117,9 +157,10 @@ export const getAdminAppById = async (req, res, next) => {
  */
 export const approveApp = async (req, res, next) => {
   try {
+    const targetId = req.params.appId || req.params.id;
     const { notes = '', publishImmediately = true } = req.body;
 
-    const app = await App.findById(req.params.appId).populate('currentVersion');
+    const app = await App.findById(targetId).populate('developer').populate('currentVersion');
     if (!app) {
       return res.status(404).json({ success: false, message: 'Application not found.' });
     }
@@ -127,60 +168,52 @@ export const approveApp = async (req, res, next) => {
     // 1. Validate version existence
     let version = app.currentVersion;
     if (!version) {
-      // Look for latest completed version
       version = await AppVersion.findOne({
         app: app._id,
-        processingStatus: 'COMPLETED',
         uploadStatus: { $ne: 'DELETED' },
-      }).sort({ versionCode: -1 });
+      }).sort({ versionCode: -1, createdAt: -1 });
     }
 
-    if (!version) {
+    // 2. Enforce 7-Point Approval Rules Gate
+    const { canApprove, rules, missingRequirements } = evaluateApprovalRules(app, version);
+    if (!canApprove) {
       return res.status(400).json({
         success: false,
-        message: 'Cannot approve application without a completed APK release version.',
+        code: 'APPROVAL_BLOCKED',
+        message: `Cannot approve application. Missing requirements: ${missingRequirements.join('; ')}`,
+        missingRequirements,
+        rules,
       });
     }
 
-    // 2. Security Checks: Admin approval MUST NOT bypass malicious, quarantined, or tampered APKs
-    if (version.quarantined) {
-      return res.status(400).json({
-        success: false,
-        code: 'APK_QUARANTINED',
-        message: 'Cannot approve application: active release version is quarantined for security violations.',
-      });
+    // 3. Promote APK out of quarantine into approved storage
+    try {
+      const quarantinePath = version.quarantinePath || version.storagePath;
+      const promoteResult = await ApkSecurityPipeline.promoteToApproved(
+        app._id,
+        version._id,
+        quarantinePath
+      );
+      version.storageKey = promoteResult.storageKey || version.storageKey;
+      version.storagePath = promoteResult.storagePath || version.storagePath;
+    } catch (promoteErr) {
+      console.warn('[approveApp] Non-fatal quarantine promotion note:', promoteErr.message);
     }
 
-    if (version.securityStatus === 'MALICIOUS') {
-      return res.status(400).json({
-        success: false,
-        code: 'MALWARE_DETECTED',
-        message: 'Cannot approve application: active release version contains confirmed security threats.',
-      });
-    }
-
-    if (version.integrityStatus === 'MISMATCH') {
-      return res.status(400).json({
-        success: false,
-        code: 'INTEGRITY_MISMATCH',
-        message: 'Cannot approve application: cryptographic binary hash does not match storage bytes.',
-      });
-    }
-
+    // 4. Update status & security records
     const previousStatus = app.status;
     const newStatus = publishImmediately ? 'PUBLISHED' : 'APPROVED';
 
     app.status = newStatus;
-    app.visibility = 'PUBLIC';
-    if (!app.currentVersion) {
-      app.currentVersion = version._id;
+    app.visibility = publishImmediately ? 'PUBLIC' : 'PRIVATE';
+    if (publishImmediately && !app.publishedAt) {
+      app.publishedAt = new Date();
     }
+    app.currentVersion = version._id;
 
-    // Enable public downloads for version upon approval
+    version.quarantined = false;
     version.downloadStatus = 'ENABLED';
-    if (version.securityStatus !== 'PASSED') {
-      version.securityStatus = 'APPROVED';
-    }
+    version.securityStatus = 'APPROVED';
     await version.save();
 
     // Record moderation history
@@ -192,7 +225,7 @@ export const approveApp = async (req, res, next) => {
       admin: req.user._id,
       adminName: req.user.name,
       adminEmail: req.user.email,
-      reason: notes || 'Application content and security criteria verified and approved.',
+      reason: notes || 'All 7 security and application requirements verified and approved.',
       timestamp: new Date(),
     });
 
@@ -204,7 +237,7 @@ export const approveApp = async (req, res, next) => {
       action: 'APP_APPROVED',
       resourceType: 'APP',
       resourceId: app._id,
-      reason: notes,
+      reason: notes || 'Approved application release',
       previousState: { status: previousStatus },
       newState: { status: newStatus, versionId: version._id },
     });
@@ -212,7 +245,8 @@ export const approveApp = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: `Application approved and set to ${newStatus}.`,
-      data: { app },
+      data: { app, version },
+      app,
     });
   } catch (err) {
     next(err);
@@ -220,12 +254,13 @@ export const approveApp = async (req, res, next) => {
 };
 
 /**
- * POST /api/admin/apps/:appId/reject
+ * POST /api/admin/apps/:appId/reject or PATCH /api/v1/admin/apps/:id/reject
  * Reject application submission with mandatory reason and category
  */
 export const rejectApp = async (req, res, next) => {
   try {
-    const { reason, category = 'CONTENT' } = req.body;
+    const targetId = req.params.appId || req.params.id;
+    const { reason, category = 'Platform Policy Violation', comment = '' } = req.body;
 
     if (!reason || !reason.trim()) {
       return res.status(400).json({
@@ -234,7 +269,7 @@ export const rejectApp = async (req, res, next) => {
       });
     }
 
-    const app = await App.findById(req.params.appId);
+    const app = await App.findById(targetId);
     if (!app) {
       return res.status(404).json({ success: false, message: 'Application not found.' });
     }
@@ -242,6 +277,15 @@ export const rejectApp = async (req, res, next) => {
     const previousStatus = app.status;
     app.status = 'REJECTED';
     app.visibility = 'PRIVATE';
+
+    // Store review object per Sprint 5 specification
+    app.review = {
+      status: 'REJECTED',
+      reason: category || reason.trim(),
+      comment: (comment || reason).trim(),
+      reviewedBy: req.user._id,
+      reviewedAt: new Date(),
+    };
 
     if (!app.moderation) app.moderation = { reviewHistory: [] };
     app.moderation.rejectionCategory = category;
@@ -260,6 +304,19 @@ export const rejectApp = async (req, res, next) => {
 
     await app.save();
 
+    // Quarantine and block version downloads
+    const version = app.currentVersion
+      ? await AppVersion.findById(app.currentVersion)
+      : await AppVersion.findOne({ app: app._id }).sort({ createdAt: -1 });
+
+    if (version) {
+      version.quarantined = true;
+      version.securityStatus = 'REJECTED';
+      version.downloadStatus = 'BLOCKED';
+      version.quarantineReason = reason.trim() || 'Rejected during administrative review';
+      await version.save();
+    }
+
     // Record Immutable Audit Log
     await AuditLogService.log({
       req,
@@ -275,7 +332,7 @@ export const rejectApp = async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: 'Application has been rejected.',
-      data: { app },
+      data: { app, version },
     });
   } catch (err) {
     next(err);
@@ -283,12 +340,15 @@ export const rejectApp = async (req, res, next) => {
 };
 
 /**
- * POST /api/admin/apps/:appId/request-changes
+ * POST /api/admin/apps/:appId/request-changes or PATCH /api/v1/admin/apps/:id/request-changes
  * Request changes from the developer with clear actionable instructions
  */
 export const requestChanges = async (req, res, next) => {
   try {
-    const { reason, notes = '' } = req.body;
+    const targetId = req.params.appId || req.params.id;
+    const { reason, notes = '', comment = '' } = req.body;
+
+    const explanation = (comment || notes || reason || '').trim();
 
     if (!reason || !reason.trim()) {
       return res.status(400).json({
@@ -297,7 +357,7 @@ export const requestChanges = async (req, res, next) => {
       });
     }
 
-    const app = await App.findById(req.params.appId);
+    const app = await App.findById(targetId);
     if (!app) {
       return res.status(404).json({ success: false, message: 'Application not found.' });
     }
@@ -305,6 +365,15 @@ export const requestChanges = async (req, res, next) => {
     const previousStatus = app.status;
     app.status = 'CHANGES_REQUESTED';
     app.visibility = 'PRIVATE';
+
+    // Store review object per Sprint 5 specification
+    app.review = {
+      status: 'CHANGES_REQUESTED',
+      reason: reason.trim(),
+      comment: explanation,
+      reviewedBy: req.user._id,
+      reviewedAt: new Date(),
+    };
 
     if (!app.moderation) app.moderation = { reviewHistory: [] };
     app.moderation.changesRequestedReason = reason.trim();

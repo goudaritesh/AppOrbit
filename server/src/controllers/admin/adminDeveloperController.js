@@ -1,6 +1,8 @@
 import { User } from '../../models/User.js';
 import { App } from '../../models/App.js';
 import { Subscription } from '../../models/Subscription.js';
+import { SubscriptionPlan, DEFAULT_PLANS } from '../../models/SubscriptionPlan.js';
+import { DeveloperProfile } from '../../models/DeveloperProfile.js';
 import { Payment } from '../../models/Payment.js';
 import { SecurityReport } from '../../models/SecurityReport.js';
 import { AuditLogService } from '../../services/admin/auditLogService.js';
@@ -357,6 +359,199 @@ export const addAdminNote = async (req, res, next) => {
   }
 };
 
+/**
+ * PATCH /api/v1/admin/developers/:id/status
+ * Update developer account status (ACTIVE, SUSPENDED, BANNED, PENDING_VERIFICATION) and verification
+ */
+export const updateDeveloperStatus = async (req, res, next) => {
+  try {
+    const targetId = req.params.developerId || req.params.id;
+    const { status, verificationStatus, verificationLevel, reason = '' } = req.body;
+
+    const developer = await User.findOne({
+      _id: targetId,
+      role: 'DEVELOPER',
+    });
+
+    if (!developer) {
+      return res.status(404).json({ success: false, message: 'Developer account not found.' });
+    }
+
+    const previousStatus = developer.accountStatus;
+
+    if (status) {
+      if (!['ACTIVE', 'SUSPENDED', 'BANNED', 'RESTRICTED', 'PENDING_VERIFICATION'].includes(status)) {
+        return res.status(400).json({ success: false, message: 'Invalid developer status specified.' });
+      }
+      developer.accountStatus = status;
+      if (status === 'SUSPENDED' || status === 'BANNED') {
+        developer.suspensionReason = reason || developer.suspensionReason;
+        developer.suspensionType = status === 'BANNED' ? 'INDEFINITE' : 'TEMPORARY';
+      } else if (status === 'ACTIVE') {
+        developer.suspensionReason = '';
+        developer.suspensionType = 'NONE';
+        developer.suspendedUntil = null;
+      }
+    }
+
+    const targetVerification = verificationStatus || verificationLevel;
+    if (targetVerification) {
+      developer.verificationLevel = targetVerification;
+      if (['VERIFIED', 'TRUSTED'].includes(targetVerification)) {
+        developer.isVerified = true;
+        developer.emailVerified = true;
+      }
+    }
+
+    if (reason && reason.trim()) {
+      developer.adminNotes.push({
+        note: `Status update: ${status || 'status'} (${reason.trim()})`,
+        author: req.user._id,
+        createdAt: new Date(),
+      });
+    }
+
+    await developer.save();
+
+    await DeveloperProfile.findOneAndUpdate(
+      { userId: developer._id },
+      {
+        $set: {
+          developerStatus: developer.accountStatus === 'BANNED' ? 'BANNED' : developer.accountStatus === 'SUSPENDED' ? 'SUSPENDED' : 'ACTIVE',
+          ...(targetVerification && ['UNVERIFIED', 'PENDING', 'VERIFIED', 'REJECTED'].includes(targetVerification) ? { verificationStatus: targetVerification } : {}),
+        },
+      }
+    );
+
+    await AuditLogService.log({
+      req,
+      action: status === 'SUSPENDED' ? 'DEVELOPER_SUSPENDED' : status === 'BANNED' ? 'DEVELOPER_BANNED' : 'DEVELOPER_STATUS_UPDATED',
+      resourceType: 'DEVELOPER',
+      resourceId: developer._id,
+      reason: reason.trim(),
+      previousState: { status: previousStatus },
+      newState: { status: developer.accountStatus, verificationStatus: targetVerification },
+      severity: status === 'BANNED' ? 'CRITICAL' : 'INFO',
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Developer account status updated to ${developer.accountStatus}.`,
+      data: { developer },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+/**
+ * PATCH /api/v1/admin/developers/:id/plan
+ * Assign or update developer subscription tier (FREE, SILVER, GOLD, DIAMOND)
+ */
+export const updateDeveloperPlan = async (req, res, next) => {
+  try {
+    const targetId = req.params.developerId || req.params.id;
+    const { plan, appLimit, appsLimit, endDate, durationDays = 30, status = 'ACTIVE', reason = '' } = req.body;
+
+    if (!plan) {
+      return res.status(400).json({ success: false, message: 'Plan name or slug is required.' });
+    }
+
+    const developer = await User.findOne({
+      _id: targetId,
+      role: 'DEVELOPER',
+    });
+
+    if (!developer) {
+      return res.status(404).json({ success: false, message: 'Developer account not found.' });
+    }
+
+    const planSlugNormalized = plan.toLowerCase().trim();
+    const planNameUpper = plan.toUpperCase().trim();
+
+    let mappedLimit = 1;
+    if (planSlugNormalized.includes('diamond')) mappedLimit = 50;
+    else if (planSlugNormalized.includes('gold')) mappedLimit = 10;
+    else if (planSlugNormalized.includes('silver')) mappedLimit = 5;
+    else if (planSlugNormalized.includes('free')) mappedLimit = 1;
+
+    const finalAppLimit = appLimit !== undefined ? parseInt(appLimit, 10) : (appsLimit !== undefined ? parseInt(appsLimit, 10) : mappedLimit);
+
+    let subscriptionPlan = await SubscriptionPlan.findOne({
+      $or: [{ slug: planSlugNormalized }, { name: new RegExp(`^${planSlugNormalized}$`, 'i') }],
+    });
+
+    if (!subscriptionPlan) {
+      const defaultMatch = DEFAULT_PLANS.find((p) => p.slug === planSlugNormalized) || {
+        name: planNameUpper,
+        slug: planSlugNormalized,
+        price: planSlugNormalized.includes('diamond') ? 999 : planSlugNormalized.includes('gold') ? 599 : planSlugNormalized.includes('silver') ? 399 : 0,
+        currency: 'INR',
+        appLimit: finalAppLimit,
+        billingPeriod: 'MONTHLY',
+        features: [`Up to ${finalAppLimit} applications`],
+        isActive: true,
+      };
+      subscriptionPlan = await SubscriptionPlan.create(defaultMatch);
+    }
+
+    await Subscription.updateMany(
+      { developer: developer._id, status: 'ACTIVE' },
+      { $set: { status: 'CANCELLED' } }
+    );
+
+    let calculatedEndDate = endDate ? new Date(endDate) : null;
+    if (!calculatedEndDate && planSlugNormalized !== 'free') {
+      calculatedEndDate = new Date();
+      calculatedEndDate.setDate(calculatedEndDate.getDate() + parseInt(durationDays, 10));
+    }
+
+    const newSubscription = await Subscription.create({
+      developer: developer._id,
+      plan: subscriptionPlan._id,
+      planSlug: subscriptionPlan.slug,
+      status: status || 'ACTIVE',
+      appsLimit: finalAppLimit,
+      startDate: new Date(),
+      endDate: calculatedEndDate,
+      grantedBy: req.user._id,
+      adminNotes: reason ? `Admin updated plan: ${reason}` : `Assigned ${subscriptionPlan.name} plan by admin`,
+    });
+
+    developer.adminNotes.push({
+      note: `Plan updated to ${subscriptionPlan.name} (Limit: ${finalAppLimit}) by admin. Reason: ${reason || 'Administrative change'}`,
+      author: req.user._id,
+      createdAt: new Date(),
+    });
+    await developer.save();
+
+    await AuditLogService.log({
+      req,
+      action: 'DEVELOPER_PLAN_CHANGED',
+      resourceType: 'DEVELOPER',
+      resourceId: developer._id,
+      reason: reason || `Plan assigned to ${subscriptionPlan.name}`,
+      newState: {
+        plan: subscriptionPlan.name,
+        planSlug: subscriptionPlan.slug,
+        appLimit: finalAppLimit,
+        subscriptionId: newSubscription._id,
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: `Developer plan successfully updated to ${subscriptionPlan.name}.`,
+      data: {
+        subscription: newSubscription,
+        developer,
+      },
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
 export default {
   getAdminDevelopers,
   getAdminDeveloperById,
@@ -364,4 +559,6 @@ export default {
   restoreDeveloper,
   restrictDeveloper,
   addAdminNote,
+  updateDeveloperStatus,
+  updateDeveloperPlan,
 };

@@ -25,6 +25,8 @@ import {
   restoreDeveloper,
   restrictDeveloper,
   addAdminNote,
+  updateDeveloperStatus,
+  updateDeveloperPlan,
 } from '../controllers/admin/adminDeveloperController.js';
 import {
   getAdminUsers,
@@ -66,6 +68,7 @@ import {
   getPlatformReports,
   getPlatformReportById,
   resolveReport,
+  updateReportStatus,
 } from '../controllers/admin/adminReportController.js';
 import {
   getAdminNotifications,
@@ -95,25 +98,28 @@ router.get('/dashboard/analytics', getDashboardAnalytics);
 router.get('/search', globalAdminSearch);
 
 // ============================================================================
-// 3. APPLICATION MODERATION
+// 3. APPLICATION MODERATION & APPROVAL WORKFLOW
 // ============================================================================
 router.get('/apps', requirePermission(ADMIN_PERMISSIONS.APP_READ), getAdminApps);
 router.get('/apps/:appId', requirePermission(ADMIN_PERMISSIONS.APP_READ), getAdminAppById);
 router.get('/apps/:appId/security', requirePermission(ADMIN_PERMISSIONS.SECURITY_READ), getAdminSecurityReport);
 router.post('/apps/:appId/approve', requirePermission(ADMIN_PERMISSIONS.APP_APPROVE), approveApp);
-router.patch('/apps/:appId/approve', requirePermission(ADMIN_PERMISSIONS.APP_APPROVE), approveApk);
+router.patch('/apps/:appId/approve', requirePermission(ADMIN_PERMISSIONS.APP_APPROVE), approveApp);
 router.post('/apps/:appId/reject', requirePermission(ADMIN_PERMISSIONS.APP_REJECT), rejectApp);
-router.patch('/apps/:appId/reject', requirePermission(ADMIN_PERMISSIONS.APP_REJECT), rejectApk);
+router.patch('/apps/:appId/reject', requirePermission(ADMIN_PERMISSIONS.APP_REJECT), rejectApp);
 router.patch('/apps/:appId/suspend', requirePermission(ADMIN_PERMISSIONS.APP_BLOCK), suspendApp);
 router.post('/apps/:appId/request-changes', requirePermission(ADMIN_PERMISSIONS.APP_REVIEW), requestChanges);
+router.patch('/apps/:appId/request-changes', requirePermission(ADMIN_PERMISSIONS.APP_REVIEW), requestChanges);
 router.post('/apps/:appId/block', requirePermission(ADMIN_PERMISSIONS.APP_BLOCK), blockApp);
 router.post('/apps/:appId/unpublish', requirePermission(ADMIN_PERMISSIONS.APP_APPROVE), unpublishApp);
 
 // ============================================================================
-// 4. DEVELOPER MANAGEMENT
+// 4. DEVELOPER MANAGEMENT & SUBSCRIPTIONS
 // ============================================================================
 router.get('/developers', requirePermission(ADMIN_PERMISSIONS.DEVELOPER_READ), getAdminDevelopers);
 router.get('/developers/:developerId', requirePermission(ADMIN_PERMISSIONS.DEVELOPER_READ), getAdminDeveloperById);
+router.patch('/developers/:developerId/status', requirePermission(ADMIN_PERMISSIONS.DEVELOPER_UPDATE), updateDeveloperStatus);
+router.patch('/developers/:developerId/plan', requirePermission(ADMIN_PERMISSIONS.SUBSCRIPTION_MANAGE), updateDeveloperPlan);
 router.post('/developers/:developerId/suspend', requirePermission(ADMIN_PERMISSIONS.DEVELOPER_SUSPEND), suspendDeveloper);
 router.post('/developers/:developerId/restore', requirePermission(ADMIN_PERMISSIONS.DEVELOPER_SUSPEND), restoreDeveloper);
 router.post('/developers/:developerId/restrict', requirePermission(ADMIN_PERMISSIONS.DEVELOPER_UPDATE), restrictDeveloper);
@@ -125,6 +131,7 @@ router.post('/developers/:developerId/notes', requirePermission(ADMIN_PERMISSION
 router.get('/users', requirePermission(ADMIN_PERMISSIONS.DEVELOPER_READ), getAdminUsers);
 router.get('/users/:userId', requirePermission(ADMIN_PERMISSIONS.DEVELOPER_READ), getAdminUserById);
 router.post('/users/:userId/status', requirePermission(ADMIN_PERMISSIONS.DEVELOPER_UPDATE), updateUserStatus);
+router.patch('/users/:userId/status', requirePermission(ADMIN_PERMISSIONS.DEVELOPER_UPDATE), updateUserStatus);
 
 // ============================================================================
 // 6. SECURITY REVIEW CENTER
@@ -149,6 +156,7 @@ router.post('/subscriptions/:developerId/update', requirePermission(ADMIN_PERMIS
 router.get('/payments', requirePermission(ADMIN_PERMISSIONS.PAYMENT_READ), getAdminPayments);
 router.get('/payments/:paymentId', requirePermission(ADMIN_PERMISSIONS.PAYMENT_READ), getAdminPaymentById);
 router.post('/payments/:paymentId/verify', requirePermission(ADMIN_PERMISSIONS.PAYMENT_VERIFY), verifyPayment);
+router.patch('/payments/:paymentId/verify', requirePermission(ADMIN_PERMISSIONS.PAYMENT_VERIFY), verifyPayment);
 
 // ============================================================================
 // 9. SUPPORT TICKETING SYSTEM
@@ -165,6 +173,7 @@ router.post('/support/:ticketId/assign', requirePermission(ADMIN_PERMISSIONS.SUP
 router.get('/reports', requirePermission(ADMIN_PERMISSIONS.REPORT_READ), getPlatformReports);
 router.get('/reports/:reportId', requirePermission(ADMIN_PERMISSIONS.REPORT_READ), getPlatformReportById);
 router.post('/reports/:reportId/resolve', requirePermission(ADMIN_PERMISSIONS.REPORT_RESOLVE), resolveReport);
+router.patch('/reports/:reportId', requirePermission(ADMIN_PERMISSIONS.REPORT_RESOLVE), updateReportStatus);
 
 // ============================================================================
 // 11. NOTIFICATIONS INBOX
