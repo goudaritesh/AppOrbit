@@ -26,6 +26,7 @@ const router = Router();
 
 // Public Authentication Endpoints
 router.post('/signup', authRateLimiter, validate(signupValidation), signup);
+router.post('/register', authRateLimiter, validate(signupValidation), signup);
 router.post('/login', authRateLimiter, validate(loginValidation), login);
 router.post('/logout', logout);
 router.post('/refresh-token', refreshToken);
