@@ -20,6 +20,10 @@ import {
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import Badge from '../../components/ui/Badge';
+import DragDropUploader from '../../components/common/DragDropUploader';
+import ImagePreview from '../../components/common/ImagePreview';
+import ScreenshotGrid from '../../components/common/ScreenshotGrid';
+import VideoPreview from '../../components/common/VideoPreview';
 import { createApp, submitApp } from '../../api/developerPortalApi';
 import { getCategories } from '../../api/categoriesApi';
 
@@ -181,6 +185,56 @@ export const CreateApplicationPage = () => {
       ...prev,
       screenshots: prev.screenshots.filter((_, idx) => idx !== idxToRemove),
     }));
+  };
+
+  // Sprint 3 Local File Selection Handlers
+  const [iconMode, setIconMode] = useState('upload'); // 'upload' | 'url'
+  const [videoMode, setVideoMode] = useState('embed'); // 'upload' | 'embed'
+
+  const handleLocalIconFile = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      updateField('icon', e.target.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleLocalScreenshotFiles = (files) => {
+    if (!files) return;
+    const fileArray = Array.isArray(files) ? files : [files];
+    const available = 10 - formData.screenshots.length;
+    const toProcess = fileArray.slice(0, available);
+
+    toProcess.forEach((f) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFormData((prev) => {
+          if (prev.screenshots.length >= 10) return prev;
+          return {
+            ...prev,
+            screenshots: [
+              ...prev.screenshots,
+              { url: e.target.result, alt: f.name, order: prev.screenshots.length + 1 },
+            ],
+          };
+        });
+      };
+      reader.readAsDataURL(f);
+    });
+  };
+
+  const handleLocalVideoFile = (file) => {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      updateField('demoVideo', {
+        type: 'direct',
+        url: e.target.result,
+        provider: 'direct',
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   // Validation per step
@@ -647,97 +701,183 @@ export const CreateApplicationPage = () => {
 
         {/* STEP 4: MEDIA & LINKS */}
         {currentStep === 4 && (
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-6">
             <div>
               <h2 className="text-lg font-bold font-heading text-content-primary">
                 Media Assets & External Links
               </h2>
               <p className="text-xs text-content-muted mt-0.5">
-                Provide image assets, video demonstrations, and source repositories.
+                Upload branding icons, screenshots gallery, and demonstration videos directly from your computer.
               </p>
             </div>
 
-            {/* App Icon URL */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-content-primary">App Icon URL</label>
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-surface-elevated border border-white/10 flex items-center justify-center overflow-hidden flex-shrink-0">
-                  {formData.icon ? (
-                    <img src={formData.icon} alt="Icon Preview" className="w-full h-full object-cover" />
+            {/* 1. App Icon */}
+            <div className="flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-content-primary">
+                  App Icon (PNG, JPG, WEBP • Max 5 MB)
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setIconMode('upload')}
+                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                      iconMode === 'upload'
+                        ? 'bg-primary text-white border-primary font-bold'
+                        : 'bg-surface-elevated text-content-muted border-white/10'
+                    }`}
+                  >
+                    Upload from PC
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIconMode('url')}
+                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                      iconMode === 'url'
+                        ? 'bg-primary text-white border-primary font-bold'
+                        : 'bg-surface-elevated text-content-muted border-white/10'
+                    }`}
+                  >
+                    Paste URL
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-start gap-4">
+                <ImagePreview
+                  src={formData.icon}
+                  alt="App Icon Preview"
+                  onRemove={formData.icon ? () => updateField('icon', '') : null}
+                />
+
+                <div className="flex-1 w-full">
+                  {iconMode === 'upload' ? (
+                    <DragDropUploader
+                      accept="image/png,image/jpeg,image/webp"
+                      maxSizeMb={5}
+                      title="Choose App Icon from Computer"
+                      description="Drag & drop PNG, JPG, or WEBP (Max 5 MB)"
+                      onFilesSelected={handleLocalIconFile}
+                    />
                   ) : (
-                    <Smartphone className="w-5 h-5 text-content-dim" />
+                    <input
+                      type="url"
+                      value={formData.icon}
+                      onChange={(e) => updateField('icon', e.target.value)}
+                      placeholder="https://example.com/icon.png"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
+                    />
                   )}
                 </div>
-                <input
-                  type="url"
-                  value={formData.icon}
-                  onChange={(e) => updateField('icon', e.target.value)}
-                  placeholder="https://example.com/icon.png"
-                  className="flex-1 px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
-                />
               </div>
             </div>
 
-            {/* Screenshots */}
-            <div className="flex flex-col gap-2 pt-3 border-t border-white/5">
+            {/* 2. Screenshots */}
+            <div className="flex flex-col gap-3 pt-4 border-t border-white/5">
               <label className="text-xs font-semibold text-content-primary">
-                Screenshots (URLs)
+                Application Screenshots (Up to 10 images)
               </label>
-              <div className="flex items-center gap-2">
+
+              {formData.screenshots.length < 10 && (
+                <DragDropUploader
+                  accept="image/png,image/jpeg,image/webp"
+                  maxSizeMb={10}
+                  multiple={true}
+                  title="Upload Screenshots from Computer"
+                  description="Select up to 10 screenshots (PNG, JPG, WEBP, max 10MB each)"
+                  onFilesSelected={handleLocalScreenshotFiles}
+                />
+              )}
+
+              {formData.screenshots.length > 0 && (
+                <ScreenshotGrid
+                  screenshots={formData.screenshots}
+                  onDelete={removeScreenshot}
+                  onReorder={(reordered) => updateField('screenshots', reordered)}
+                />
+              )}
+
+              {/* Fallback URL Input */}
+              <div className="flex items-center gap-2 pt-1">
                 <input
                   type="url"
                   value={screenshotInput}
                   onChange={(e) => setScreenshotInput(e.target.value)}
-                  placeholder="https://example.com/screenshot.jpg"
+                  placeholder="Or paste screenshot URL: https://example.com/screenshot.jpg"
                   className="flex-1 px-3.5 py-2 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
                 />
                 <Button variant="outline" size="sm" onClick={addScreenshot}>
-                  Add Shot
+                  Add URL
                 </Button>
               </div>
+            </div>
 
-              {formData.screenshots.length > 0 && (
-                <div className="flex gap-3 overflow-x-auto py-2">
-                  {formData.screenshots.map((s, idx) => (
-                    <div
-                      key={idx}
-                      className="relative w-36 h-24 rounded-xl overflow-hidden border border-white/10 flex-shrink-0 group"
-                    >
-                      <img src={s.url} alt="" className="w-full h-full object-cover" />
-                      <button
-                        onClick={() => removeScreenshot(idx)}
-                        className="absolute top-1 right-1 p-1 rounded-md bg-black/70 text-white hover:text-accent-rose transition-colors"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
+            {/* 3. Demo Video */}
+            <div className="flex flex-col gap-3 pt-4 border-t border-white/5">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-content-primary">
+                  Demo Video
+                </label>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setVideoMode('embed')}
+                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                      videoMode === 'embed'
+                        ? 'bg-primary text-white border-primary font-bold'
+                        : 'bg-surface-elevated text-content-muted border-white/10'
+                    }`}
+                  >
+                    YouTube Embed URL
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVideoMode('upload')}
+                    className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                      videoMode === 'upload'
+                        ? 'bg-primary text-white border-primary font-bold'
+                        : 'bg-surface-elevated text-content-muted border-white/10'
+                    }`}
+                  >
+                    Upload Video File
+                  </button>
                 </div>
+              </div>
+
+              {videoMode === 'upload' ? (
+                <DragDropUploader
+                  accept="video/mp4,video/webm"
+                  maxSizeMb={100}
+                  title="Upload Demo Video from Computer"
+                  description="MP4 or WEBM format (Max 100 MB)"
+                  onFilesSelected={handleLocalVideoFile}
+                />
+              ) : (
+                <input
+                  type="url"
+                  value={formData.demoVideo?.url || ''}
+                  onChange={(e) =>
+                    updateField('demoVideo', {
+                      url: e.target.value,
+                      type: 'youtube',
+                      provider: 'youtube',
+                    })
+                  }
+                  placeholder="https://www.youtube.com/watch?v=..."
+                  className="px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
+                />
+              )}
+
+              {formData.demoVideo?.url && (
+                <VideoPreview
+                  video={formData.demoVideo}
+                  onRemove={() => updateField('demoVideo', { type: 'youtube', url: '', provider: 'youtube' })}
+                />
               )}
             </div>
 
-            {/* Demo Video URL */}
-            <div className="flex flex-col gap-1.5 pt-3 border-t border-white/5">
-              <label className="text-xs font-semibold text-content-primary">
-                YouTube Demo Video URL
-              </label>
-              <input
-                type="url"
-                value={formData.demoVideo?.url || ''}
-                onChange={(e) =>
-                  updateField('demoVideo', {
-                    url: e.target.value,
-                    type: 'youtube',
-                    provider: 'youtube',
-                  })
-                }
-                placeholder="https://www.youtube.com/watch?v=..."
-                className="px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
-              />
-            </div>
-
-            {/* GitHub & Web Links */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-white/5">
+            {/* 4. GitHub & Web Links */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-semibold text-content-primary">
                   GitHub Repository URL

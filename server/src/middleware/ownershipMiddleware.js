@@ -11,7 +11,7 @@ import App from '../models/App.js';
  */
 export const verifyAppOwnership = async (req, res, next) => {
   try {
-    const { appId } = req.params;
+    const appId = req.params.appId || req.params.id;
 
     if (!appId || !mongoose.Types.ObjectId.isValid(appId)) {
       return res.status(404).json({
@@ -29,8 +29,9 @@ export const verifyAppOwnership = async (req, res, next) => {
       });
     }
 
-    // Strict ownership verification: app developer must match authenticated user
-    if (app.developer.toString() !== req.user._id.toString()) {
+    // Strict ownership verification: app developer must match authenticated user (admins can manage all)
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN'].includes(req.user?.role);
+    if (!isAdmin && app.developer.toString() !== req.user._id.toString()) {
       return res.status(404).json({
         success: false,
         message: 'Application not found',

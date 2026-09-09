@@ -19,6 +19,12 @@ import ApplicationStatusBadge from '../../components/developer/ApplicationStatus
 import PageLoader from '../../components/common/PageLoader';
 import NotFound from '../../components/common/NotFound';
 import Modal from '../../components/ui/Modal';
+import DragDropUploader from '../../components/common/DragDropUploader';
+import ImagePreview from '../../components/common/ImagePreview';
+import ScreenshotGrid from '../../components/common/ScreenshotGrid';
+import VideoPreview from '../../components/common/VideoPreview';
+import UploadProgress from '../../components/common/UploadProgress';
+import APKUploadCard from '../../components/developer/APKUploadCard';
 import {
   getDeveloperApp,
   updateApp,
@@ -26,6 +32,10 @@ import {
   archiveApp,
   restoreApp,
   deleteApp,
+  uploadAppIcon,
+  uploadAppScreenshots,
+  uploadAppDemoVideo,
+  deleteAppScreenshot,
 } from '../../api/developerPortalApi';
 import { getCategories } from '../../api/categoriesApi';
 
@@ -76,6 +86,72 @@ export const EditApplicationPage = () => {
   const [featureInput, setFeatureInput] = useState('');
   const [customTechInput, setCustomTechInput] = useState('');
   const [screenshotInput, setScreenshotInput] = useState('');
+
+  // Sprint 3 Upload States
+  const [iconUploading, setIconUploading] = useState(false);
+  const [iconProgress, setIconProgress] = useState(0);
+  const [shotsUploading, setShotsUploading] = useState(false);
+  const [shotsProgress, setShotsProgress] = useState(0);
+  const [videoUploading, setVideoUploading] = useState(false);
+  const [videoProgress, setVideoProgress] = useState(0);
+  const [iconMode, setIconMode] = useState('upload'); // 'upload' | 'url'
+  const [videoMode, setVideoMode] = useState('embed'); // 'upload' | 'embed'
+
+  const handleIconUpload = async (file) => {
+    if (!file) return;
+    setIconUploading(true);
+    setIconProgress(0);
+    try {
+      const res = await uploadAppIcon(appId, file, (pct) => setIconProgress(pct));
+      updateField('icon', res.data?.icon);
+      setFeedback({ type: 'success', message: 'App icon uploaded successfully' });
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.response?.data?.message || 'Failed to upload icon' });
+    } finally {
+      setIconUploading(false);
+    }
+  };
+
+  const handleScreenshotsUpload = async (files) => {
+    if (!files) return;
+    const fileArray = Array.isArray(files) ? files : [files];
+    setShotsUploading(true);
+    setShotsProgress(0);
+    try {
+      const res = await uploadAppScreenshots(appId, fileArray, (pct) => setShotsProgress(pct));
+      updateField('screenshots', res.data?.screenshots || []);
+      setFeedback({ type: 'success', message: `${fileArray.length} screenshot(s) uploaded successfully` });
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.response?.data?.message || 'Failed to upload screenshots' });
+    } finally {
+      setShotsUploading(false);
+    }
+  };
+
+  const handleScreenshotDelete = async (idx, shotId) => {
+    try {
+      const res = await deleteAppScreenshot(appId, shotId);
+      updateField('screenshots', res.data?.screenshots || formData.screenshots.filter((_, i) => i !== idx));
+      setFeedback({ type: 'success', message: 'Screenshot removed' });
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.response?.data?.message || 'Failed to delete screenshot' });
+    }
+  };
+
+  const handleVideoUpload = async (file) => {
+    if (!file) return;
+    setVideoUploading(true);
+    setVideoProgress(0);
+    try {
+      const res = await uploadAppDemoVideo(appId, file, (pct) => setVideoProgress(pct));
+      updateField('demoVideo', res.data?.demoVideo || { type: 'direct', url: res.data?.url, provider: 'direct' });
+      setFeedback({ type: 'success', message: 'Demo video uploaded successfully' });
+    } catch (err) {
+      setFeedback({ type: 'error', message: err.response?.data?.message || 'Failed to upload video' });
+    } finally {
+      setVideoUploading(false);
+    }
+  };
 
   // Confirmation modal
   const [confirmModal, setConfirmModal] = useState({
@@ -568,72 +644,188 @@ export const EditApplicationPage = () => {
           </div>
         </Card>
 
-        {/* Section 4: Media & Links */}
-        <Card padding="lg" className="flex flex-col gap-5 shadow-glass">
-          <h2 className="text-base font-heading font-bold text-content-primary pb-3 border-b border-white/5">
-            Media & Links
-          </h2>
-
-          {/* Icon */}
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-semibold text-content-primary">App Icon URL</label>
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-surface-elevated border border-white/10 flex items-center justify-center overflow-hidden flex-shrink-0">
-                {formData.icon ? (
-                  <img src={formData.icon} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <Smartphone className="w-5 h-5 text-content-dim" />
-                )}
-              </div>
-              <input
-                type="url"
-                value={formData.icon}
-                onChange={(e) => updateField('icon', e.target.value)}
-                placeholder="https://example.com/icon.png"
-                className="flex-1 px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
-              />
+        {/* Section 4: Media & Visuals (Direct Computer Upload & URLs) */}
+        <Card padding="lg" className="flex flex-col gap-6 shadow-glass">
+          <div className="flex items-center justify-between pb-3 border-b border-white/5">
+            <div>
+              <h2 className="text-base font-heading font-bold text-content-primary">
+                Media Assets & Visuals
+              </h2>
+              <p className="text-xs text-content-muted">
+                Upload branding icons, screenshots gallery, and demonstration videos directly from your computer.
+              </p>
             </div>
           </div>
 
-          {/* Screenshots */}
-          <div className="flex flex-col gap-2 pt-3 border-t border-white/5">
-            <label className="text-xs font-semibold text-content-primary">Screenshots</label>
-            <div className="flex items-center gap-2">
+          {/* 1. App Icon Upload */}
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-content-primary">
+                Application Icon (512x512 recommended)
+              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIconMode('upload')}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                    iconMode === 'upload'
+                      ? 'bg-primary text-white border-primary font-bold'
+                      : 'bg-surface-elevated text-content-muted border-white/10'
+                  }`}
+                >
+                  Upload from PC
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIconMode('url')}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                    iconMode === 'url'
+                      ? 'bg-primary text-white border-primary font-bold'
+                      : 'bg-surface-elevated text-content-muted border-white/10'
+                  }`}
+                >
+                  Enter Image URL
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row items-start gap-4">
+              <ImagePreview
+                src={formData.icon}
+                alt="App Icon"
+                onRemove={formData.icon ? () => updateField('icon', '') : null}
+              />
+
+              <div className="flex-1 w-full">
+                {iconMode === 'upload' ? (
+                  <>
+                    {iconUploading ? (
+                      <UploadProgress
+                        progress={iconProgress}
+                        statusText="Uploading app icon..."
+                      />
+                    ) : (
+                      <DragDropUploader
+                        accept="image/png,image/jpeg,image/webp"
+                        maxSizeMb={5}
+                        title="Choose App Icon from Computer"
+                        description="Drag & drop PNG, JPG, or WEBP (Max 5 MB)"
+                        onFilesSelected={handleIconUpload}
+                      />
+                    )}
+                  </>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="url"
+                      value={formData.icon}
+                      onChange={(e) => updateField('icon', e.target.value)}
+                      placeholder="https://example.com/icon.png"
+                      className="flex-1 px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 2. Screenshots Gallery */}
+          <div className="flex flex-col gap-3 pt-4 border-t border-white/5">
+            <label className="text-xs font-semibold text-content-primary">
+              Application Screenshots (Up to 10 images)
+            </label>
+
+            {shotsUploading ? (
+              <UploadProgress
+                progress={shotsProgress}
+                statusText="Uploading screenshots to cloud storage..."
+              />
+            ) : (
+              formData.screenshots.length < 10 && (
+                <DragDropUploader
+                  accept="image/png,image/jpeg,image/webp"
+                  maxSizeMb={10}
+                  multiple={true}
+                  title="Upload Screenshots from Computer"
+                  description="Select up to 10 screenshots (PNG, JPG, WEBP, max 10MB each)"
+                  onFilesSelected={handleScreenshotsUpload}
+                />
+              )
+            )}
+
+            {formData.screenshots.length > 0 && (
+              <ScreenshotGrid
+                screenshots={formData.screenshots}
+                onDelete={handleScreenshotDelete}
+                onReorder={(reordered) => updateField('screenshots', reordered)}
+              />
+            )}
+
+            {/* Fallback URL Add */}
+            <div className="flex items-center gap-2 pt-2">
               <input
                 type="url"
                 value={screenshotInput}
                 onChange={(e) => setScreenshotInput(e.target.value)}
-                placeholder="https://example.com/screenshot.jpg"
+                placeholder="Or paste an image URL: https://example.com/screenshot.jpg"
                 className="flex-1 px-3.5 py-2 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
               />
               <Button variant="outline" size="sm" onClick={addScreenshot}>
-                Add Shot
+                Add URL
               </Button>
             </div>
-            {formData.screenshots.length > 0 && (
-              <div className="flex gap-3 overflow-x-auto py-2">
-                {formData.screenshots.map((s, idx) => (
-                  <div
-                    key={idx}
-                    className="relative w-32 h-20 rounded-xl overflow-hidden border border-white/10 flex-shrink-0"
-                  >
-                    <img src={s.url} alt="" className="w-full h-full object-cover" />
-                    <button
-                      onClick={() => removeScreenshot(idx)}
-                      className="absolute top-1 right-1 p-1 rounded-md bg-black/70 text-white hover:text-accent-rose"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
-          {/* Demo Video & Links */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3 border-t border-white/5">
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-content-primary">Demo Video URL</label>
+          {/* 3. Demo Video */}
+          <div className="flex flex-col gap-3 pt-4 border-t border-white/5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-content-primary">
+                Demo Video
+              </label>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setVideoMode('embed')}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                    videoMode === 'embed'
+                      ? 'bg-primary text-white border-primary font-bold'
+                      : 'bg-surface-elevated text-content-muted border-white/10'
+                  }`}
+                >
+                  YouTube / Embed URL
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVideoMode('upload')}
+                  className={`text-[11px] px-2.5 py-1 rounded-lg border transition-all ${
+                    videoMode === 'upload'
+                      ? 'bg-primary text-white border-primary font-bold'
+                      : 'bg-surface-elevated text-content-muted border-white/10'
+                  }`}
+                >
+                  Upload MP4 Video
+                </button>
+              </div>
+            </div>
+
+            {videoMode === 'upload' ? (
+              <>
+                {videoUploading ? (
+                  <UploadProgress
+                    progress={videoProgress}
+                    statusText="Uploading video file..."
+                  />
+                ) : (
+                  <DragDropUploader
+                    accept="video/mp4,video/webm"
+                    maxSizeMb={100}
+                    title="Upload Demo Video from Computer"
+                    description="MP4 or WEBM format (Max 100 MB)"
+                    onFilesSelected={handleVideoUpload}
+                  />
+                )}
+              </>
+            ) : (
               <input
                 type="url"
                 value={formData.demoVideo?.url || ''}
@@ -644,23 +836,62 @@ export const EditApplicationPage = () => {
                     provider: 'youtube',
                   })
                 }
-                placeholder="https://youtube.com/watch?v=..."
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
+              />
+            )}
+
+            {formData.demoVideo?.url && (
+              <VideoPreview
+                video={formData.demoVideo}
+                onRemove={() => updateField('demoVideo', { type: 'youtube', url: '', provider: 'youtube' })}
+              />
+            )}
+          </div>
+
+          {/* 4. External Code Repositories & Demo Links */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 border-t border-white/5">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-content-primary">GitHub Repository URL</label>
+              <input
+                type="url"
+                value={formData.githubUrl}
+                onChange={(e) => updateField('githubUrl', e.target.value)}
+                placeholder="https://github.com/organization/repo"
                 className="px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
               />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-semibold text-content-primary">GitHub URL</label>
+              <label className="text-xs font-semibold text-content-primary">Web Preview / Demo URL</label>
               <input
                 type="url"
-                value={formData.githubUrl}
-                onChange={(e) => updateField('githubUrl', e.target.value)}
-                placeholder="https://github.com/..."
+                value={formData.demoUrl}
+                onChange={(e) => updateField('demoUrl', e.target.value)}
+                placeholder="https://app-preview.example.com"
                 className="px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
               />
             </div>
           </div>
         </Card>
+
+        {/* Section 4.5: Sprint 3 APK Upload & Binary Management */}
+        <APKUploadCard
+          appId={appId}
+          currentApk={formData.currentVersion}
+          onUploadSuccess={(apkData) => {
+            setFormData((prev) => ({
+              ...prev,
+              currentVersion: apkData,
+              version: apkData.version || apkData.versionName || prev.version,
+              packageName: apkData.apkMetadata?.packageName || prev.packageName,
+            }));
+            setFeedback({
+              type: 'success',
+              message: 'APK binary successfully uploaded, validated, and linked to app!',
+            });
+          }}
+        />
 
         {/* Section 5: State Actions & Danger Zone */}
         <Card padding="lg" className="flex flex-col gap-4 border border-white/10 shadow-glass">

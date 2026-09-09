@@ -84,6 +84,111 @@ export const getAppAnalytics = async (appId) => {
   return await apiClient.get(`/developer/apps/${appId}/analytics`);
 };
 
+/**
+ * Sprint 3: Upload Application Icon
+ * @param {string} appId
+ * @param {File} file
+ * @param {Function} onProgress
+ */
+export const uploadAppIcon = async (appId, file, onProgress) => {
+  const formData = new FormData();
+  formData.append('icon', file);
+  return await apiClient.post(`/apps/${appId}/icon`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (progressEvent) => {
+      if (onProgress && progressEvent.total) {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percentCompleted, progressEvent.loaded, progressEvent.total);
+      }
+    },
+  });
+};
+
+/**
+ * Sprint 3: Upload Application Screenshots
+ * @param {string} appId
+ * @param {File[]} files
+ * @param {Function} onProgress
+ */
+export const uploadAppScreenshots = async (appId, files, onProgress) => {
+  const formData = new FormData();
+  files.forEach((file) => {
+    formData.append('screenshots', file);
+  });
+  return await apiClient.post(`/apps/${appId}/screenshots`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (progressEvent) => {
+      if (onProgress && progressEvent.total) {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percentCompleted, progressEvent.loaded, progressEvent.total);
+      }
+    },
+  });
+};
+
+/**
+ * Sprint 3: Upload Application Demo Video
+ * @param {string} appId
+ * @param {File} file
+ * @param {Function} onProgress
+ */
+export const uploadAppDemoVideo = async (appId, file, onProgress) => {
+  const formData = new FormData();
+  formData.append('video', file);
+  return await apiClient.post(`/apps/${appId}/demo-video`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (progressEvent) => {
+      if (onProgress && progressEvent.total) {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percentCompleted, progressEvent.loaded, progressEvent.total);
+      }
+    },
+  });
+};
+
+/**
+ * Sprint 3: Upload Application APK Binary
+ * @param {string} appId
+ * @param {File} file
+ * @param {Object} data
+ * @param {Function} onProgress
+ */
+export const uploadAppApk = async (appId, file, data = {}, onProgress) => {
+  const formData = new FormData();
+  formData.append('apk', file);
+  if (data.versionName) formData.append('versionName', data.versionName);
+  if (data.versionCode) formData.append('versionCode', data.versionCode);
+  if (data.releaseNotes) formData.append('releaseNotes', data.releaseNotes);
+
+  return await apiClient.post(`/apps/${appId}/apk`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    onUploadProgress: (progressEvent) => {
+      if (onProgress && progressEvent.total) {
+        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        onProgress(percentCompleted, progressEvent.loaded, progressEvent.total);
+      }
+    },
+  });
+};
+
+/**
+ * Sprint 3: Delete Screenshot
+ * @param {string} appId
+ * @param {string} screenshotId
+ */
+export const deleteAppScreenshot = async (appId, screenshotId) => {
+  return await apiClient.delete(`/apps/${appId}/screenshots/${screenshotId}`);
+};
+
+/**
+ * Sprint 3: Delete Media Asset
+ * @param {string} appId
+ * @param {string} mediaId
+ */
+export const deleteAppMedia = async (appId, mediaId) => {
+  return await apiClient.delete(`/apps/${appId}/media/${mediaId}`);
+};
+
 export default {
   getDeveloperApps,
   getDeveloperApp,
@@ -95,4 +200,10 @@ export default {
   restoreApp,
   getDeveloperAnalytics,
   getAppAnalytics,
+  uploadAppIcon,
+  uploadAppScreenshots,
+  uploadAppDemoVideo,
+  uploadAppApk,
+  deleteAppScreenshot,
+  deleteAppMedia,
 };

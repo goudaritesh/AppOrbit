@@ -145,6 +145,7 @@ export const AppRoutes = () => {
           <Route path="apps/create" element={<CreateApplicationPage />} />
           <Route path="apps/:appId" element={<DeveloperAppDetailsPage />} />
           <Route path="apps/:appId/edit" element={<EditApplicationPage />} />
+          <Route path="apps/:appId/media" element={<EditApplicationPage />} />
           <Route path="apps/:appId/versions" element={<DeveloperVersionsPage />} />
           <Route path="apps/:appId/versions/:versionId/security" element={<DeveloperVersionSecurityPage />} />
           <Route path="apps/:appId/analytics" element={<DeveloperAppAnalyticsPage />} />

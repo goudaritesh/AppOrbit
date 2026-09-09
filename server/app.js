@@ -4,6 +4,11 @@ import cors from 'cors';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 import apiRouter from './src/routes/index.js';
 import healthRoutes from './src/routes/healthRoutes.js';
@@ -76,6 +81,18 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+
+// Static Media Uploads (App Icons, Screenshots, Demo Videos)
+app.use(
+  '/uploads',
+  cors(),
+  express.static(path.resolve(__dirname, 'storage/uploads'), {
+    maxAge: '1d',
+    setHeaders: (res) => {
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    },
+  })
+);
 
 /* ==========================================================================
    3. HTTP REQUEST LOGGING (Morgan)

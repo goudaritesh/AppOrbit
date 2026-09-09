@@ -22,7 +22,7 @@ const screenshotSchema = new mongoose.Schema(
       default: 0,
     },
   },
-  { _id: false }
+  { _id: true }
 );
 
 const currentVersionSchema = new mongoose.Schema(

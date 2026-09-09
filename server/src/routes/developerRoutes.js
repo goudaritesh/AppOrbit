@@ -47,6 +47,20 @@ import {
   updateVersionValidation,
   stripRestrictedVersionFields,
 } from '../validators/developerVersionValidator.js';
+import {
+  uploadIcon,
+  uploadScreenshots as uploadScreenshotsMiddleware,
+  uploadDemoVideo as uploadDemoVideoMiddleware,
+  uploadApk as uploadApkMiddleware,
+} from '../middleware/uploadMiddleware.js';
+import {
+  uploadAppIcon,
+  uploadScreenshots as uploadScreenshotsHandler,
+  uploadDemoVideo as uploadDemoVideoHandler,
+  uploadAppApk,
+  deleteScreenshot,
+  deleteMedia,
+} from '../controllers/uploadController.js';
 import multer from 'multer';
 
 const maxApkMb = parseInt(process.env.MAX_APK_SIZE_MB, 10) || 200;
@@ -118,6 +132,31 @@ router.delete('/apps/:appId', verifyAppOwnership, deleteApp);
 router.post('/apps/:appId/submit', verifyAppOwnership, submitApp);
 router.post('/apps/:appId/archive', verifyAppOwnership, archiveApp);
 router.post('/apps/:appId/restore', verifyAppOwnership, restoreApp);
+
+/* ==========================================================================
+   4.1 Sprint 3 App Media & APK Upload Endpoints
+   ========================================================================== */
+router.post('/apps/:appId/icon', verifyAppOwnership, uploadIcon, uploadAppIcon);
+router.post(
+  '/apps/:appId/screenshots',
+  verifyAppOwnership,
+  uploadScreenshotsMiddleware,
+  uploadScreenshotsHandler
+);
+router.post(
+  '/apps/:appId/demo-video',
+  verifyAppOwnership,
+  uploadDemoVideoMiddleware,
+  uploadDemoVideoHandler
+);
+router.post(
+  '/apps/:appId/apk',
+  verifyAppOwnership,
+  uploadApkMiddleware,
+  uploadAppApk
+);
+router.delete('/apps/:appId/screenshots/:screenshotId', verifyAppOwnership, deleteScreenshot);
+router.delete('/apps/:appId/media/:mediaId', verifyAppOwnership, deleteMedia);
 
 /* ==========================================================================
    5. APK Upload, Version Lifecycle & Releases (Phase 5)
