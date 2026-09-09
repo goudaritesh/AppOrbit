@@ -6,6 +6,19 @@ import {
   getAppBySlug,
 } from '../controllers/appController.js';
 import {
+  createApp,
+  updateApp,
+  deleteApp,
+  submitApp,
+} from '../controllers/developerAppController.js';
+import { protect, authorizeRoles } from '../middleware/authMiddleware.js';
+import { verifyAppOwnership } from '../middleware/ownershipMiddleware.js';
+import {
+  createAppValidation,
+  updateAppValidation,
+  stripRestrictedAppFields,
+} from '../validators/developerAppValidator.js';
+import {
   sanitizeQueryParams,
   appQueryValidation,
   validate,
@@ -35,10 +48,46 @@ router.get('/recently-updated', cacheRoute(120), getRecentlyUpdated);
 router.use('/:appId/reviews', appReviewRouter);
 router.use('/:appId/download', appDownloadRouter);
 
-// 3. Main Marketplace Discovery (Search, Filter, Sort, Paginate)
+// 3. Developer App Management Aliases (POST /apps, PATCH /apps/:appId, DELETE /apps/:appId, POST /apps/:appId/submit)
+router.post(
+  '/',
+  protect,
+  authorizeRoles('DEVELOPER', 'ADMIN', 'SUPER_ADMIN'),
+  stripRestrictedAppFields,
+  validate(createAppValidation),
+  createApp
+);
+
+router.patch(
+  '/:appId',
+  protect,
+  authorizeRoles('DEVELOPER', 'ADMIN', 'SUPER_ADMIN'),
+  verifyAppOwnership,
+  stripRestrictedAppFields,
+  validate(updateAppValidation),
+  updateApp
+);
+
+router.delete(
+  '/:appId',
+  protect,
+  authorizeRoles('DEVELOPER', 'ADMIN', 'SUPER_ADMIN'),
+  verifyAppOwnership,
+  deleteApp
+);
+
+router.post(
+  '/:appId/submit',
+  protect,
+  authorizeRoles('DEVELOPER', 'ADMIN', 'SUPER_ADMIN'),
+  verifyAppOwnership,
+  submitApp
+);
+
+// 4. Main Marketplace Discovery (Search, Filter, Sort, Paginate)
 router.get('/', sanitizeQueryParams, validate(appQueryValidation), getApps);
 
-// 4. Application Details & Related Apps by Slug or ID
+// 5. Application Details & Related Apps by Slug or ID
 router.get('/:slug/related', getRelatedApps);
 router.get('/:slug', getAppBySlug);
 
