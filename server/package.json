@@ -1,0 +1,36 @@
+{
+  "name": "apporbit-server",
+  "version": "1.0.0",
+  "description": "AppOrbit Backend REST API - Android App Publishing & Distribution Platform",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "seed:admin": "node src/scripts/seedAdmin.js",
+    "seed": "node src/scripts/seedMarketplace.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.1127.0",
+    "@aws-sdk/s3-request-presigner": "^3.1127.0",
+    "adm-zip": "^0.6.0",
+    "app-info-parser": "^1.1.6",
+    "bcryptjs": "^3.0.3",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.3.1",
+    "express-validator": "^7.3.2",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^8.5.1",
+    "morgan": "^1.10.0",
+    "multer": "^2.3.0",
+    "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

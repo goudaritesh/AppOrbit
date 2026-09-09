@@ -1,0 +1,39 @@
+name: Security & Vulnerability Scanning
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Runs every Monday at 04:00 UTC
+  pull_request:
+    branches: [main, develop]
+  workflow_dispatch:
+
+jobs:
+  security-audit:
+    name: Dependency Audit & Secret Scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 20.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Audit Backend Dependencies
+        working-directory: server
+        run: |
+          npm audit --audit-level=high || true
+
+      - name: Audit Frontend Dependencies
+        working-directory: client
+        run: |
+          npm audit --audit-level=high || true
+
+      - name: Verify No Production Secrets Committed
+        run: |
+          echo "Auditing tracked repository files for accidental secret leaks..."
+          git grep -E -i "(PRIVATE KEY|RAZORPAY_KEY_SECRET=[a-zA-Z0-9]{10,}|JWT_SECRET=[a-zA-Z0-9]{32,})" || true

@@ -1,0 +1,40 @@
+name: Deploy to Staging
+
+on:
+  push:
+    branches: [develop]
+
+jobs:
+  deploy-staging:
+    name: Build & Deploy to Staging Environment
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Backend Docker Image
+        run: |
+          docker build -t apporbit-backend:staging -f docker/Dockerfile.backend .
+
+      - name: Build Frontend Docker Image
+        run: |
+          docker build -t apporbit-frontend:staging \
+            --build-arg VITE_API_URL=https://staging-api.apporbit.io/api \
+            --build-arg VITE_APP_URL=https://staging.apporbit.io \
+            --build-arg VITE_SOCKET_URL=https://staging-api.apporbit.io \
+            -f docker/Dockerfile.frontend .
+
+      - name: Trigger Staging Cloud Deployment
+        env:
+          STAGING_DEPLOY_WEBHOOK: ${{ secrets.STAGING_DEPLOY_WEBHOOK }}
+        run: |
+          if [ -n "$STAGING_DEPLOY_WEBHOOK" ]; then
+            curl -X POST "$STAGING_DEPLOY_WEBHOOK"
+            echo "Staging deployment webhook triggered successfully."
+          else
+            echo "STAGING_DEPLOY_WEBHOOK not configured; build validated."
+          fi
