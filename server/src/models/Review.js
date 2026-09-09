@@ -43,13 +43,17 @@ const reviewSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: {
-        values: ['ACTIVE', 'PENDING', 'HIDDEN', 'REMOVED', 'FLAGGED'],
+        values: ['ACTIVE', 'PUBLISHED', 'PENDING', 'HIDDEN', 'REMOVED', 'FLAGGED'],
         message: '{VALUE} is not a valid review status',
       },
       default: 'ACTIVE',
       index: true,
     },
     isVerifiedDownload: {
+      type: Boolean,
+      default: false,
+    },
+    verifiedUsage: {
       type: Boolean,
       default: false,
     },
@@ -75,6 +79,23 @@ const reviewSchema = new mongoose.Schema(
         default: null,
       },
     },
+    developerResponse: {
+      message: {
+        type: String,
+        trim: true,
+        maxlength: [1000, 'Developer response cannot exceed 1000 characters'],
+        default: null,
+      },
+      respondedAt: {
+        type: Date,
+        default: null,
+      },
+      developerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        default: null,
+      },
+    },
     deletedAt: {
       type: Date,
       default: null,
@@ -82,8 +103,18 @@ const reviewSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+reviewSchema.virtual('appId').get(function () {
+  return this.application;
+});
+
+reviewSchema.virtual('userId').get(function () {
+  return this.user;
+});
 
 // One review per user per application
 reviewSchema.index({ application: 1, user: 1 }, { unique: true });

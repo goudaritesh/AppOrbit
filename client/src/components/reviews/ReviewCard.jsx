@@ -97,7 +97,7 @@ export const ReviewCard = ({
       </div>
 
       {/* Developer Reply if present */}
-      {review.developerReply?.message && (
+      {(review.developerResponse?.message || review.developerReply?.message) && (
         <div className="mt-3 pl-4 border-l-2 border-indigo-500/60 bg-indigo-950/20 p-3 rounded-r-xl space-y-1">
           <div className="flex items-center justify-between text-xs">
             <span className="font-semibold text-indigo-400 flex items-center space-x-1">
@@ -105,14 +105,16 @@ export const ReviewCard = ({
               <span>Developer Response</span>
             </span>
             <span className="text-slate-500">
-              {new Date(review.developerReply.repliedAt).toLocaleDateString('en-US', {
+              {new Date(
+                review.developerResponse?.respondedAt || review.developerReply?.repliedAt || Date.now()
+              ).toLocaleDateString('en-US', {
                 month: 'short',
                 day: 'numeric',
               })}
             </span>
           </div>
           <p className="text-xs text-slate-300 leading-relaxed">
-            {review.developerReply.message}
+            {review.developerResponse?.message || review.developerReply?.message}
           </p>
         </div>
       )}
@@ -133,7 +135,7 @@ export const ReviewCard = ({
           {review.helpfulCount > 0 && <span>({review.helpfulCount})</span>}
         </button>
 
-        {isDeveloper && !review.developerReply?.message && (
+        {isDeveloper && !(review.developerResponse?.message || review.developerReply?.message) && (
           <button
             type="button"
             onClick={() => onReply && onReply(review)}

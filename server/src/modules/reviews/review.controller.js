@@ -3,13 +3,16 @@ import ReviewService from './review.service.js';
 export const createReview = async (req, res, next) => {
   try {
     const { appId } = req.params;
-    const { rating, title, comment } = req.body;
+    const { rating, title, comment, upsert } = req.body;
+    const isUpsert = upsert === true || req.query.upsert === 'true';
+
     const review = await ReviewService.createReview({
       appId,
       userId: req.user._id,
       rating,
       title,
       comment,
+      upsert: isUpsert,
     });
 
     res.status(201).json({
@@ -196,3 +199,28 @@ export const moderateReview = async (req, res, next) => {
     next(error);
   }
 };
+
+export const getDeveloperReviews = async (req, res, next) => {
+  try {
+    const { appId, rating, status, responded, sort, page, limit } = req.query;
+    const result = await ReviewService.getDeveloperReviews({
+      developerId: req.user._id,
+      appId,
+      rating,
+      status,
+      responded,
+      sort,
+      page,
+      limit,
+    });
+
+    res.json({
+      success: true,
+      data: result,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const respondReview = developerReply;

@@ -18,11 +18,26 @@ const reviewVoteSchema = new mongoose.Schema(
       required: [true, 'User is required for a vote'],
       index: true,
     },
+    type: {
+      type: String,
+      enum: ['HELPFUL'],
+      default: 'HELPFUL',
+    },
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+reviewVoteSchema.virtual('reviewId').get(function () {
+  return this.review;
+});
+
+reviewVoteSchema.virtual('userId').get(function () {
+  return this.user;
+});
 
 // Unique index: one vote per user per review
 reviewVoteSchema.index({ review: 1, user: 1 }, { unique: true });

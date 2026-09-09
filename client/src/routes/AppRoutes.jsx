@@ -53,6 +53,7 @@ const DeveloperPricingPage = lazy(() => import('../pages/developer/DeveloperPric
 const DeveloperSubscriptionPage = lazy(() => import('../pages/developer/DeveloperSubscriptionPage'));
 const DeveloperPaymentsPage = lazy(() => import('../pages/developer/DeveloperPaymentsPage'));
 const DeveloperNotificationSettingsPage = lazy(() => import('../pages/developer/DeveloperNotificationSettingsPage'));
+const DeveloperReviewsPage = lazy(() => import('../pages/developer/DeveloperReviewsPage'));
 
 // Admin Pages (Lazy)
 const AdminDashboardPage = lazy(() => import('../pages/admin/AdminDashboardPage'));
@@ -167,6 +168,7 @@ export const AppRoutes = () => {
           <Route path="subscription" element={<DeveloperSubscriptionPage />} />
           <Route path="payments" element={<DeveloperPaymentsPage />} />
           <Route path="settings/notifications" element={<DeveloperNotificationSettingsPage />} />
+          <Route path="reviews" element={<DeveloperReviewsPage />} />
           <Route path="analytics" element={<DeveloperAnalyticsPage />} />
           <Route path="profile" element={<DeveloperProfileSettingsPage />} />
           <Route path="settings" element={<DeveloperSettingsPage />} />

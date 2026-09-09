@@ -24,8 +24,10 @@ const reviewReportSchema = new mongoose.Schema(
         values: [
           'SPAM',
           'FAKE_REVIEW',
+          'OFFENSIVE_LANGUAGE',
           'ABUSIVE',
           'HARASSMENT',
+          'IRRELEVANT_CONTENT',
           'MISLEADING',
           'INAPPROPRIATE',
           'OTHER',
@@ -44,10 +46,10 @@ const reviewReportSchema = new mongoose.Schema(
     status: {
       type: String,
       enum: {
-        values: ['PENDING', 'REVIEWED', 'DISMISSED'],
+        values: ['OPEN', 'PENDING', 'UNDER_REVIEW', 'RESOLVED', 'REVIEWED', 'DISMISSED'],
         message: '{VALUE} is not a valid report status',
       },
-      default: 'PENDING',
+      default: 'OPEN',
       index: true,
     },
     reviewedBy: {

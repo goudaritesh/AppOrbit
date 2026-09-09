@@ -9,9 +9,9 @@ export const reviewsApi = {
   createReview: (appId, data) =>
     api.post(`/apps/${appId}/reviews`, data),
 
-  // Update a review
+  // Update a review (PATCH or PUT)
   updateReview: (reviewId, data) =>
-    api.put(`/reviews/${reviewId}`, data),
+    api.patch(`/reviews/${reviewId}`, data),
 
   // Delete a review
   deleteReview: (reviewId) =>
@@ -29,9 +29,15 @@ export const reviewsApi = {
   reportReview: (reviewId, data) =>
     api.post(`/reviews/${reviewId}/report`, data),
 
-  // Developer reply
+  // Developer response (support both /respond and /reply)
   developerReply: (reviewId, data) =>
-    api.post(`/reviews/${reviewId}/reply`, data),
+    api.post(`/reviews/${reviewId}/respond`, data),
+  respondReview: (reviewId, data) =>
+    api.post(`/reviews/${reviewId}/respond`, data),
+
+  // Developer review dashboard list
+  getDeveloperReviews: (params = {}) =>
+    api.get('/developer/reviews', { params }),
 
   // Admin moderation list
   getAdminReviews: (params = {}) =>
@@ -39,7 +45,9 @@ export const reviewsApi = {
 
   // Admin moderate review
   moderateReview: (reviewId, data) =>
-    api.patch(`/admin/reviews/${reviewId}/moderate`, data),
+    api.patch(`/admin/reviews/${reviewId}/status`, data),
+  updateReviewStatus: (reviewId, data) =>
+    api.patch(`/admin/reviews/${reviewId}/status`, data),
 };
 
 export default reviewsApi;

@@ -302,8 +302,18 @@ const appSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+appSchema.virtual('ratingStats').get(function () {
+  return {
+    average: this.ratingAverage || 0,
+    totalRatings: this.ratingCount || 0,
+    distribution: this.ratingDistribution || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  };
+});
 
 // Compound indexes for optimal marketplace discovery and sorting
 appSchema.index({ status: 1, visibility: 1, publishedAt: -1 });

@@ -27,8 +27,8 @@ export const ReviewForm = ({
       toast.error('Please select a rating between 1 and 5 stars');
       return;
     }
-    if (!comment.trim()) {
-      toast.error('Please provide a comment for your review');
+    if (!comment.trim() || comment.trim().length < 10) {
+      toast.error('Review comment must be at least 10 characters');
       return;
     }
 
@@ -85,15 +85,20 @@ export const ReviewForm = ({
 
       {/* Comment Input */}
       <div className="space-y-1.5">
-        <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
-          Review Comment *
-        </label>
+        <div className="flex items-center justify-between">
+          <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            Review Comment *
+          </label>
+          <span className="text-[11px] text-slate-500 font-mono">
+            {comment.length} / 1000 (min 10 chars)
+          </span>
+        </div>
         <textarea
           rows={4}
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           placeholder="What did you like or dislike? How does it perform?"
-          maxLength={2000}
+          maxLength={1000}
           required
           className="w-full px-4 py-2.5 bg-slate-800/80 border border-slate-700/80 rounded-xl text-slate-100 placeholder-slate-500 text-sm focus:outline-none focus:border-indigo-500 transition-colors resize-none"
         />

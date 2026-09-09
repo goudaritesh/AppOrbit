@@ -34,6 +34,7 @@ export const Sidebar = ({ portalType = 'developer', isOpen, onClose }) => {
   const developerLinks = [
     { label: 'Dashboard', path: '/developer', icon: <LayoutDashboard className="w-4 h-4" /> },
     { label: 'My Applications', path: '/developer/apps', icon: <Boxes className="w-4 h-4" /> },
+    { label: 'Community Reviews', path: '/developer/reviews', icon: <MessageSquare className="w-4 h-4 text-purple-400" /> },
     { label: 'Create Application', path: '/developer/apps/create', icon: <PlusCircle className="w-4 h-4 text-accent-cyan" /> },
     { label: 'Upgrade Plans', path: '/developer/pricing', icon: <Crown className="w-4 h-4 text-amber-400" /> },
     { label: 'Subscription', path: '/developer/subscription', icon: <Sparkles className="w-4 h-4 text-accent-cyan" /> },

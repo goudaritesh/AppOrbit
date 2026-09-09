@@ -4,7 +4,10 @@ import ReviewVote from '../../models/ReviewVote.js';
 import ReviewReport from '../../models/ReviewReport.js';
 import App from '../../models/App.js';
 import DownloadEvent from '../../models/DownloadEvent.js';
+import Download from '../../models/Download.js';
 import AuditLog from '../../models/AuditLog.js';
+import { NotificationDispatcher } from '../../services/notification/notificationDispatcher.js';
+import { NotificationService } from '../../services/admin/notificationService.js';
 
 export class ReviewService {
   /**
@@ -14,7 +17,7 @@ export class ReviewService {
     const objectId = new mongoose.Types.ObjectId(appId);
 
     const stats = await Review.aggregate([
-      { $match: { application: objectId, status: 'ACTIVE' } },
+      { $match: { application: objectId, status: { $in: ['ACTIVE', 'PUBLISHED'] } } },
       {
         $group: {
           _id: null,
@@ -55,13 +58,22 @@ export class ReviewService {
       { new: true }
     );
 
-    return { ratingAverage, ratingCount, ratingDistribution };
+    return {
+      ratingAverage,
+      ratingCount,
+      ratingDistribution,
+      ratingStats: {
+        average: ratingAverage,
+        totalRatings: ratingCount,
+        distribution: ratingDistribution,
+      },
+    };
   }
 
   /**
-   * Creates a review for an application.
+   * Creates or updates a review for an application.
    */
-  static async createReview({ appId, userId, rating, title = '', comment }) {
+  static async createReview({ appId, userId, rating, title = '', comment, upsert = false }) {
     // 1. Validate application (support ObjectId or slug)
     const isObjectId = mongoose.isValidObjectId(appId);
     const app = isObjectId ? await App.findById(appId) : await App.findOne({ slug: appId });
@@ -80,13 +92,19 @@ export class ReviewService {
       throw error;
     }
 
-    if (!comment || comment.trim().length === 0) {
-      const error = new Error('Review comment is required');
+    if (!comment || comment.trim().length < 10) {
+      const error = new Error('Review comment must be at least 10 characters');
       error.statusCode = 400;
       throw error;
     }
 
-    // 3. Check for existing review by this user
+    if (comment.trim().length > 1000) {
+      const error = new Error('Review comment cannot exceed 1000 characters');
+      error.statusCode = 400;
+      throw error;
+    }
+
+    // 3. Check for existing review by this user (Sprint 7 Requirement 3)
     const existing = await Review.findOne({
       application: resolvedAppId,
       user: userId,
@@ -94,22 +112,33 @@ export class ReviewService {
     });
 
     if (existing) {
+      if (upsert) {
+        return await this.updateReview({
+          reviewId: existing._id,
+          userId,
+          rating: parsedRating,
+          title,
+          comment,
+        });
+      }
       const error = new Error(
         'You have already reviewed this application. You can edit your existing review.'
       );
       error.statusCode = 400;
       error.code = 'DUPLICATE_REVIEW';
+      error.existingReviewId = existing._id;
       throw error;
     }
 
-    // 4. Verify download event
-    const hasDownloaded = await DownloadEvent.exists({
+    // 4. Verify download status through Download collection or DownloadEvent
+    const hasDownload = await Download.exists({ appId: resolvedAppId, userId });
+    const hasDownloadEvent = await DownloadEvent.exists({
       application: resolvedAppId,
       user: userId,
       eventType: { $in: ['DOWNLOAD_STARTED', 'DOWNLOAD_COMPLETED'] },
     });
 
-    const isVerifiedDownload = !!hasDownloaded;
+    const isVerifiedDownload = !!(hasDownload || hasDownloadEvent);
 
     // 5. Create review
     const review = await Review.create({
@@ -117,13 +146,28 @@ export class ReviewService {
       user: userId,
       rating: parsedRating,
       title: title ? title.trim().substring(0, 100) : '',
-      comment: comment.trim().substring(0, 2000),
+      comment: comment.trim().substring(0, 1000),
       status: 'ACTIVE',
       isVerifiedDownload,
+      verifiedUsage: isVerifiedDownload,
     });
 
     // 6. Recalculate rating aggregates
     await this.recalculateAppRating(resolvedAppId);
+
+    // 7. Dispatch developer notification (Sprint 7 Requirement 12)
+    if (app.developer) {
+      await NotificationDispatcher.dispatch({
+        recipient: app.developer,
+        type: 'REVIEW_RECEIVED',
+        title: '🔔 New Review',
+        message: `${app.name} received a new ${parsedRating}-star review.`,
+        priority: 'NORMAL',
+        category: 'application',
+        actionUrl: `/developer/reviews`,
+        data: { appId: app._id, reviewId: review._id, rating: parsedRating },
+      }).catch((err) => console.error('[ReviewNotification] Failed to notify developer:', err));
+    }
 
     return await Review.findById(review._id).populate('user', 'name username avatar');
   }
@@ -355,7 +399,7 @@ export class ReviewService {
    * Reports an inappropriate review.
    */
   static async reportReview({ reviewId, reporterId, reason, description = '' }) {
-    const review = await Review.findById(reviewId);
+    const review = await Review.findById(reviewId).populate('application');
     if (!review) {
       const error = new Error('Review not found');
       error.statusCode = 404;
@@ -365,7 +409,7 @@ export class ReviewService {
     const existingReport = await ReviewReport.findOne({
       review: reviewId,
       reporter: reporterId,
-      status: 'PENDING',
+      status: { $in: ['OPEN', 'PENDING', 'UNDER_REVIEW'] },
     });
 
     if (existingReport) {
@@ -379,7 +423,7 @@ export class ReviewService {
       reporter: reporterId,
       reason,
       description: description.trim().substring(0, 500),
-      status: 'PENDING',
+      status: 'OPEN',
     });
 
     // Increment review report count and auto-flag if threshold exceeded
@@ -393,6 +437,16 @@ export class ReviewService {
       updated.status = 'FLAGGED';
       await updated.save();
     }
+
+    // Sprint 7: Notify Admin of report
+    await NotificationService.notifyAdmin({
+      type: 'REVIEW_REPORTED',
+      title: '🚩 Review Reported',
+      message: `A review on "${review.application?.name || 'an application'}" was reported for ${reason}.`,
+      priority: 'HIGH',
+      resourceType: 'REVIEW',
+      resourceId: reviewId.toString(),
+    }).catch(() => {});
 
     return { success: true, message: 'Review reported successfully', reportId: report._id };
   }
@@ -420,9 +474,17 @@ export class ReviewService {
       throw error;
     }
 
+    const cleanMsg = message.trim().substring(0, 1000);
+    const now = new Date();
+
     review.developerReply = {
-      message: message.trim().substring(0, 1000),
-      repliedAt: new Date(),
+      message: cleanMsg,
+      repliedAt: now,
+    };
+    review.developerResponse = {
+      message: cleanMsg,
+      respondedAt: now,
+      developerId,
     };
 
     await review.save();
@@ -440,12 +502,25 @@ export class ReviewService {
       throw error;
     }
 
+    let targetStatus = status;
+    if (status === 'KEEP' || status === 'APPROVE') targetStatus = 'ACTIVE';
+    if (status === 'HIDE') targetStatus = 'HIDDEN';
+    if (status === 'REMOVE' || status === 'DELETE') targetStatus = 'REMOVED';
+
     const previousStatus = review.status;
-    review.status = status;
-    if (status === 'REMOVED') {
+    review.status = targetStatus;
+    if (targetStatus === 'REMOVED') {
       review.deletedAt = new Date();
     }
     await review.save();
+
+    // Update any open reports for this review
+    if (['ACTIVE', 'HIDDEN', 'REMOVED'].includes(targetStatus)) {
+      await ReviewReport.updateMany(
+        { review: reviewId, status: { $in: ['OPEN', 'PENDING', 'UNDER_REVIEW'] } },
+        { status: targetStatus === 'ACTIVE' ? 'DISMISSED' : 'RESOLVED', reviewedBy: adminId, reviewedAt: new Date() }
+      );
+    }
 
     const actorId = adminUser?._id || adminId;
     const actorRole = adminUser?.role || 'ADMIN';
@@ -454,13 +529,13 @@ export class ReviewService {
     await AuditLog.create({
       action: 'REVIEW_MODERATION',
       actor: actorId,
-      actorRole: actorRole,
-      actorEmail: actorEmail,
+      actorRole,
+      actorEmail,
       resourceType: 'REVIEW',
       resourceId: reviewId,
       reason,
       previousState: { status: previousStatus },
-      newState: { status },
+      newState: { status: targetStatus },
     });
 
     await this.recalculateAppRating(review.application);
@@ -496,6 +571,136 @@ export class ReviewService {
         limit: limitNum,
         total,
         pages: Math.ceil(total / limitNum),
+      },
+    };
+  }
+
+  /**
+   * Fetches reviews across all applications owned by a developer (Sprint 7 Requirement 11)
+   */
+  static async getDeveloperReviews({
+    developerId,
+    appId = null,
+    rating = null,
+    status = null,
+    responded = null,
+    sort = 'recent',
+    page = 1,
+    limit = 15,
+  }) {
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const limitNum = Math.min(50, Math.max(1, parseInt(limit, 10) || 15));
+    const skip = (pageNum - 1) * limitNum;
+
+    // 1. Fetch developer's applications
+    const apps = await App.find({ developer: developerId })
+      .select('_id name slug icon ratingAverage ratingCount ratingDistribution')
+      .lean();
+    const appIds = apps.map((a) => a._id);
+
+    if (appIds.length === 0) {
+      return {
+        reviews: [],
+        pagination: { page: 1, limit: limitNum, total: 0, pages: 0 },
+        apps: [],
+        stats: {
+          totalReviews: 0,
+          averageRating: 0,
+          ratingDistribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+          responseRate: 0,
+          awaitingResponse: 0,
+        },
+      };
+    }
+
+    // 2. Build review query
+    const query = {
+      application: appId && mongoose.isValidObjectId(appId) ? appId : { $in: appIds },
+      status: status || { $ne: 'REMOVED' },
+    };
+
+    if (rating && Number(rating) >= 1 && Number(rating) <= 5) {
+      query.rating = Number(rating);
+    }
+
+    if (responded === 'true') {
+      query.$or = [
+        { 'developerResponse.message': { $exists: true, $ne: null } },
+        { 'developerReply.message': { $exists: true, $ne: null } },
+      ];
+    } else if (responded === 'false') {
+      query.$and = [
+        {
+          $or: [
+            { developerResponse: { $exists: false } },
+            { 'developerResponse.message': null },
+            { 'developerResponse.message': '' },
+          ],
+        },
+        {
+          $or: [
+            { developerReply: { $exists: false } },
+            { 'developerReply.message': null },
+            { 'developerReply.message': '' },
+          ],
+        },
+      ];
+    }
+
+    let sortOptions = { createdAt: -1 };
+    if (sort === 'highest') sortOptions = { rating: -1, createdAt: -1 };
+    else if (sort === 'lowest') sortOptions = { rating: 1, createdAt: -1 };
+    else if (sort === 'helpful') sortOptions = { helpfulCount: -1, createdAt: -1 };
+
+    const [reviews, totalCount] = await Promise.all([
+      Review.find(query)
+        .sort(sortOptions)
+        .skip(skip)
+        .limit(limitNum)
+        .populate('user', 'name username avatar email')
+        .populate('application', 'name slug icon')
+        .lean(),
+      Review.countDocuments(query),
+    ]);
+
+    // 3. Overall stats across all developer's apps
+    const allReviews = await Review.find({
+      application: { $in: appIds },
+      status: { $in: ['ACTIVE', 'PUBLISHED'] },
+    }).select('rating developerResponse developerReply').lean();
+
+    const totalRevCount = allReviews.length;
+    let sumRating = 0;
+    const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    let respondedCount = 0;
+
+    for (const r of allReviews) {
+      sumRating += r.rating;
+      if (distribution[r.rating] !== undefined) distribution[r.rating]++;
+      if (r.developerResponse?.message || r.developerReply?.message) {
+        respondedCount++;
+      }
+    }
+
+    const averageRating = totalRevCount > 0 ? Math.round((sumRating / totalRevCount) * 10) / 10 : 0;
+    const responseRate = totalRevCount > 0 ? Math.round((respondedCount / totalRevCount) * 100) : 0;
+    const awaitingResponse = totalRevCount - respondedCount;
+
+    return {
+      reviews,
+      pagination: {
+        page: pageNum,
+        limit: limitNum,
+        total: totalCount,
+        pages: Math.ceil(totalCount / limitNum),
+      },
+      apps,
+      stats: {
+        totalReviews: totalRevCount,
+        averageRating,
+        ratingDistribution: distribution,
+        responseRate,
+        awaitingResponse: Math.max(0, awaitingResponse),
       },
     };
   }

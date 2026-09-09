@@ -194,9 +194,10 @@ router.get('/settings', requirePermission(ADMIN_PERMISSIONS.SETTINGS_READ), getP
 router.put('/settings', requirePermission(ADMIN_PERMISSIONS.SETTINGS_UPDATE), updatePlatformSettings);
 
 // ============================================================================
-// 14. REVIEW MODERATION & REPORTS (Phase 9)
+// 14. REVIEW MODERATION & REPORTS (Phase 9 & Sprint 7)
 // ============================================================================
 router.get('/reviews', getAdminReviews);
+router.patch('/reviews/:reviewId/status', moderateReview);
 router.patch('/reviews/:reviewId/moderate', moderateReview);
 
 export default router;

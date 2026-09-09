@@ -17,6 +17,7 @@ import {
   getDeveloperOverview,
   getAppAnalytics,
 } from '../modules/analytics/analytics.controller.js';
+import { getDeveloperReviews } from '../modules/reviews/review.controller.js';
 import {
   initializeUploadSession,
   uploadApkDirect,
@@ -217,5 +218,10 @@ router.post(
   verifyAppOwnership,
   requestSecurityReview
 );
+
+/* ==========================================================================
+   7. Community Reviews (Sprint 7)
+   ========================================================================== */
+router.get('/reviews', getDeveloperReviews);
 
 export default router;
