@@ -118,7 +118,6 @@ export class MongoSearchProvider {
         .limit(limitNum)
         .populate('developer', 'name username isVerified avatar')
         .populate('category', 'name slug icon')
-        .populate('currentVersion', 'versionName versionCode securityStatus')
         .lean(),
       App.countDocuments(query),
     ]);

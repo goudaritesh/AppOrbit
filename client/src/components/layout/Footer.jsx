@@ -91,16 +91,29 @@ export const Footer = () => {
             </h4>
             <ul className="flex flex-col space-y-2 text-xs text-content-muted">
               <li>
-                <span className="hover:text-white transition-colors cursor-pointer">Security Standards</span>
+                <Link to="/security" className="hover:text-white transition-colors">
+                  Security Standards
+                </Link>
               </li>
               <li>
-                <span className="hover:text-white transition-colors cursor-pointer">Privacy Policy</span>
+                <Link to="/privacy-policy" className="hover:text-white transition-colors">
+                  Privacy Policy
+                </Link>
               </li>
               <li>
-                <span className="hover:text-white transition-colors cursor-pointer">Terms of Service</span>
+                <Link to="/terms" className="hover:text-white transition-colors">
+                  Terms of Service
+                </Link>
               </li>
               <li>
-                <span className="hover:text-white transition-colors cursor-pointer">Developer Agreement</span>
+                <Link to="/about" className="hover:text-white transition-colors">
+                  About AppOrbit
+                </Link>
+              </li>
+              <li>
+                <Link to="/contact" className="hover:text-white transition-colors">
+                  Contact Support
+                </Link>
               </li>
             </ul>
           </div>

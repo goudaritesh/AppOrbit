@@ -45,6 +45,23 @@ export const getRecentApps = async (limit = 6) => {
 };
 
 /**
+ * Fetch latest applications (Sprint 6 alias)
+ * @param {number} limit
+ */
+export const getLatestApps = async (limit = 6) => {
+  return await apiClient.get('/apps/latest', { params: { limit } });
+};
+
+/**
+ * Search applications (Sprint 6 API)
+ * @param {string} query
+ * @param {Object} params
+ */
+export const searchApps = async (query, params = {}) => {
+  return await apiClient.get('/apps/search', { params: { q: query, ...params } });
+};
+
+/**
  * Fetch related applications for a given app
  * @param {string} slug
  */
@@ -58,5 +75,7 @@ export default {
   getFeaturedApps,
   getPopularApps,
   getRecentApps,
+  getLatestApps,
+  searchApps,
   getRelatedApps,
 };

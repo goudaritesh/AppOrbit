@@ -19,7 +19,9 @@ export const searchApps = async (req, res, next) => {
 
     res.json({
       success: true,
+      results: result.results || result.apps || [],
       data: result,
+      pagination: result.pagination,
     });
   } catch (error) {
     next(error);

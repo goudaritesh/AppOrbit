@@ -2,6 +2,7 @@ import { Router } from 'express';
 import {
   getApps,
   getFeaturedApps,
+  getPopularApps,
   getRecentApps,
   getAppBySlug,
 } from '../controllers/appController.js';
@@ -45,7 +46,7 @@ import {
 import { appReviewRouter } from '../modules/reviews/review.routes.js';
 import { appDownloadRouter } from '../modules/downloads/download.routes.js';
 import {
-  getPopularApps,
+  searchApps,
   getTrendingApps,
   getNewReleases,
   getRecentlyUpdated,
@@ -61,11 +62,13 @@ router.get('/popular', cacheRoute(120), getPopularApps);
 router.get('/trending', cacheRoute(120), getTrendingApps);
 router.get('/new', cacheRoute(120), getNewReleases);
 router.get('/recent', cacheRoute(120), getRecentApps);
+router.get('/latest', cacheRoute(120), getRecentApps);
 router.get('/recently-updated', cacheRoute(120), getRecentlyUpdated);
+router.get('/search', searchApps);
 
 // 2. Nested Application Routes (Reviews & Secure Downloads)
 router.use('/:appId/reviews', appReviewRouter);
-router.use('/:appId/download', appDownloadRouter);
+router.post('/:id/download', optionalAuth, secureDownload);
 
 // 3. Developer App Management Aliases (POST /apps, PATCH /apps/:appId, DELETE /apps/:appId, POST /apps/:appId/submit)
 router.post(
@@ -159,7 +162,6 @@ router.delete(
 // Sprint 4: APK Security, Reporting & Secure Download
 router.get('/:id/security', getPublicSecurityStatus);
 router.post('/:id/report', optionalAuth, reportApp);
-router.post('/:id/download', optionalAuth, secureDownload);
 
 // 4. Main Marketplace Discovery (Search, Filter, Sort, Paginate)
 router.get('/', sanitizeQueryParams, validate(appQueryValidation), getApps);

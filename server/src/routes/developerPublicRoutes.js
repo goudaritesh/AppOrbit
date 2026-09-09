@@ -3,7 +3,8 @@ import { getPublicDeveloperProfile } from '../controllers/developerPublicControl
 
 const router = Router();
 
-// Public Developer Profile Endpoint
+// Public Developer Profile Endpoints
+router.get('/:username', getPublicDeveloperProfile);
 router.get('/:id', getPublicDeveloperProfile);
 
 export default router;

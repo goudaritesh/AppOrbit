@@ -64,11 +64,11 @@ export const SecurityStatusCard = ({
   };
 
   const checks = [
-    { label: 'APK Validated & Structure Inspected', passed: true },
-    { label: 'Integrity Hash Available (SHA-256)', passed: Boolean(hashToDisplay) },
+    { label: 'APK Validated', passed: true },
     { label: 'Security Checks Completed', passed: true },
-    { label: 'Developer Identity Verified', passed: isDevVerified },
-    { label: 'Reviewed Before Publication', passed: true },
+    { label: 'Integrity Hash Available', passed: Boolean(hashToDisplay) },
+    { label: 'Application Reviewed', passed: true },
+    { label: 'Developer Verification Status Available', passed: Boolean(isDevVerified) },
   ];
 
   return (
@@ -80,10 +80,10 @@ export const SecurityStatusCard = ({
             <ShieldCheck className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="text-sm font-bold text-content-primary flex items-center gap-2">
-              AppOrbit Security Status
+            <h3 className="text-sm font-bold text-content-primary flex items-center gap-2 uppercase tracking-wide">
+              AppOrbit Security Check
               <span className="text-[10px] px-2 py-0.5 rounded-full font-mono font-bold bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20">
-                Verified Checks
+                Verified
               </span>
             </h3>
             <p className="text-xs text-accent-emerald font-medium">
@@ -120,7 +120,7 @@ export const SecurityStatusCard = ({
           <div className="flex items-center justify-between text-[11px]">
             <span className="font-semibold text-content-primary flex items-center gap-1.5 font-mono">
               <Hash className="w-3.5 h-3.5 text-accent-cyan" />
-              Cryptographic SHA-256 Digest
+              SHA-256
             </span>
             <button
               type="button"
@@ -150,7 +150,7 @@ export const SecurityStatusCard = ({
       <div className="flex items-start gap-2 text-[11px] text-content-muted bg-surface-base/60 p-2.5 rounded-xl border border-white/5">
         <Info className="w-4 h-4 text-content-dim flex-shrink-0 mt-0.5" />
         <p className="leading-relaxed">
-          Trust information reflects configured verification and review signals and does not guarantee that an application is completely risk-free. Always install applications responsibly.
+          This application has passed AppOrbit's configured validation and security checks. No automated or manual review can guarantee that software is completely risk-free.
         </p>
       </div>
     </Card>

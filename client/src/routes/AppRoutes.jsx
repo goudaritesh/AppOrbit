@@ -19,6 +19,13 @@ import UnauthorizedPage from '../pages/public/UnauthorizedPage';
 const SearchResultsPage = lazy(() => import('../pages/public/SearchResultsPage'));
 const UserDownloadsPage = lazy(() => import('../pages/user/UserDownloadsPage'));
 
+// Static Informational Pages (Sprint 6)
+const AboutPage = lazy(() => import('../pages/public/AboutPage'));
+const ContactPage = lazy(() => import('../pages/public/ContactPage'));
+const PrivacyPolicyPage = lazy(() => import('../pages/public/PrivacyPolicyPage'));
+const TermsPage = lazy(() => import('../pages/public/TermsPage'));
+const SecurityPage = lazy(() => import('../pages/public/SecurityPage'));
+
 // Auth Pages (Lazy)
 const LoginPage = lazy(() => import('../pages/auth/LoginPage'));
 const SignupPage = lazy(() => import('../pages/auth/SignupPage'));
@@ -83,8 +90,15 @@ export const AppRoutes = () => {
           <Route path="/apps" element={<ExplorePage />} />
           <Route path="/apps/:slug" element={<AppDetailsPage />} />
           <Route path="/categories" element={<CategoriesPage />} />
+          <Route path="/categories/:category" element={<ExplorePage />} />
+          <Route path="/developers/:username" element={<DeveloperProfilePage />} />
           <Route path="/developers/:id" element={<DeveloperProfilePage />} />
           <Route path="/search" element={<SearchResultsPage />} />
+          <Route path="/about" element={<AboutPage />} />
+          <Route path="/contact" element={<ContactPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
+          <Route path="/security" element={<SecurityPage />} />
 
           {/* Authentication Routes */}
           <Route path="/login" element={<LoginPage />} />

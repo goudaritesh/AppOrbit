@@ -81,12 +81,21 @@ export const serializePublicApp = (app) => {
     demoUrl: raw.demoUrl || '',
     currentVersion: raw.currentVersion
       ? {
-          version: raw.currentVersion.version || '1.0.0',
+          id: raw.currentVersion._id ? raw.currentVersion._id.toString() : undefined,
+          version: raw.currentVersion.version || raw.currentVersion.versionName || '1.0.0',
+          versionName: raw.currentVersion.versionName || raw.currentVersion.version || '1.0.0',
           versionCode: raw.currentVersion.versionCode || 1,
           releaseNotes: raw.currentVersion.releaseNotes || '',
-          releaseDate: raw.currentVersion.releaseDate || raw.createdAt,
-          fileSize: raw.currentVersion.fileSize || '15.0 MB',
+          releaseDate: raw.currentVersion.releaseDate || raw.currentVersion.createdAt || raw.createdAt,
+          fileSize:
+            typeof raw.currentVersion.fileSize === 'number'
+              ? `${(raw.currentVersion.fileSize / (1024 * 1024)).toFixed(1)} MB`
+              : raw.currentVersion.fileSize || '20.0 MB',
+          fileSizeBytes:
+            typeof raw.currentVersion.fileSize === 'number' ? raw.currentVersion.fileSize : null,
           minAndroid: raw.currentVersion.minAndroid || 'Android 8.0 (API 26)',
+          securityStatus: raw.currentVersion.securityStatus || 'PASSED',
+          sha256: raw.currentVersion.sha256 || raw.currentVersion.fileHash || '',
         }
       : null,
     downloadCount: raw.downloadCount || 0,
@@ -136,16 +145,29 @@ export const serializePublicDeveloper = (user, profile = null, apps = []) => {
   const rawUser = user.toObject ? user.toObject() : user;
   const rawProfile = profile && profile.toObject ? profile.toObject() : profile || {};
 
+  const verificationStatus =
+    rawUser.verificationStatus || rawProfile.verificationStatus || 'UNVERIFIED';
+  const verificationLevel =
+    rawUser.verificationLevel || (verificationStatus === 'VERIFIED' ? 'VERIFIED' : 'UNVERIFIED');
+
   return {
     id: rawUser._id.toString(),
     name: rawUser.name,
+    username:
+      rawUser.username ||
+      (rawUser.name ? rawUser.name.toLowerCase().replace(/[^a-z0-9]/g, '-') : 'developer'),
     profileImage: rawUser.profileImage || '',
     bio: rawProfile.developerBio || rawUser.bio || '',
     companyName: rawProfile.companyName || '',
     website: rawProfile.website || '',
     githubProfile: rawProfile.githubProfile || rawUser.githubUrl || '',
     portfolioUrl: rawProfile.portfolioUrl || rawUser.portfolioUrl || '',
-    verificationStatus: rawProfile.verificationStatus || 'UNVERIFIED',
+    verificationStatus,
+    verificationLevel,
+    emailVerified: Boolean(rawUser.emailVerified),
+    isVerified: Boolean(
+      rawUser.isVerified || verificationStatus === 'VERIFIED' || verificationLevel === 'TRUSTED'
+    ),
     memberSince: rawUser.createdAt,
     publishedAppsCount: apps.length,
     apps: apps.map(serializePublicApp),

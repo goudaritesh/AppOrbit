@@ -11,22 +11,38 @@ import { serializePublicDeveloper } from '../utils/serializers.js';
  */
 export const getPublicDeveloperProfile = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const identifier = req.params.username || req.params.id;
+    if (!identifier) {
+      return res.status(400).json({ success: false, message: 'Developer identifier required' });
+    }
 
     let user = null;
 
-    // Check if valid ObjectId
-    if (mongoose.Types.ObjectId.isValid(id)) {
+    // 1. Check if valid ObjectId
+    if (mongoose.Types.ObjectId.isValid(identifier)) {
       user = await User.findOne({
-        _id: id,
+        _id: identifier,
         accountStatus: 'ACTIVE',
       }).select('-password -refreshTokens -emailVerificationToken -passwordResetToken');
     }
 
-    // Fallback: search by exact name if not ObjectId
+    // 2. Check by exact username
     if (!user) {
       user = await User.findOne({
-        name: new RegExp(`^${id}$`, 'i'),
+        username: identifier.toLowerCase(),
+        accountStatus: 'ACTIVE',
+      }).select('-password -refreshTokens -emailVerificationToken -passwordResetToken');
+    }
+
+    // 3. Fallback: search by name or slugified name
+    if (!user) {
+      const sanitized = identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const unhyphenated = identifier.replace(/-/g, ' ').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      user = await User.findOne({
+        $or: [
+          { name: new RegExp(`^${sanitized}$`, 'i') },
+          { name: new RegExp(`^${unhyphenated}$`, 'i') },
+        ],
         accountStatus: 'ACTIVE',
       }).select('-password -refreshTokens -emailVerificationToken -passwordResetToken');
     }

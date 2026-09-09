@@ -1,5 +1,7 @@
+import mongoose from 'mongoose';
 import App from '../models/App.js';
 import Category from '../models/Category.js';
+import AppVersion from '../models/AppVersion.js';
 import { serializePublicApp } from '../utils/serializers.js';
 
 /**
@@ -265,6 +267,14 @@ export const getAppBySlug = async (req, res, next) => {
         success: false,
         message: 'Application not found',
       });
+    }
+
+    // Resolve currentVersion document if stored as ObjectId
+    if (app.currentVersion && mongoose.isValidObjectId(app.currentVersion)) {
+      const versionDoc = await AppVersion.findById(app.currentVersion).lean();
+      if (versionDoc) {
+        app.currentVersion = versionDoc;
+      }
     }
 
     // Controlled view count increment (asynchronous fire-and-forget to avoid blocking response)

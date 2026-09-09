@@ -20,7 +20,8 @@ import { getDeveloperProfile } from '../../api/developersApi';
 import { formatDate } from '../../utils/formatters';
 
 export const DeveloperProfilePage = () => {
-  const { id } = useParams();
+  const { id, username } = useParams();
+  const identifier = username || id;
   const navigate = useNavigate();
 
   const [developer, setDeveloper] = useState(null);
@@ -32,7 +33,7 @@ export const DeveloperProfilePage = () => {
       setLoading(true);
       setNotFound(false);
       try {
-        const res = await getDeveloperProfile(id);
+        const res = await getDeveloperProfile(identifier);
         if (res.data?.developer) {
           setDeveloper(res.data.developer);
           document.title = `${res.data.developer.name} — Developer Profile | AppOrbit`;
@@ -47,10 +48,10 @@ export const DeveloperProfilePage = () => {
       }
     };
 
-    if (id) {
+    if (identifier) {
       fetchProfile();
     }
-  }, [id]);
+  }, [identifier]);
 
   if (loading) {
     return <PageLoader message="Loading developer profile..." />;
@@ -106,11 +107,15 @@ export const DeveloperProfilePage = () => {
               <h1 className="text-2xl sm:text-3xl font-extrabold font-heading text-content-primary">
                 {developer.name}
               </h1>
-              {isVerified && (
+              {developer.verificationLevel === 'TRUSTED' ? (
                 <Badge variant="published" dot>
-                  Verified Developer
+                  🛡️ Trusted Developer
                 </Badge>
-              )}
+              ) : isVerified ? (
+                <Badge variant="published" dot>
+                  ✓ Developer Verified
+                </Badge>
+              ) : null}
             </div>
 
             {developer.companyName && (
@@ -126,16 +131,39 @@ export const DeveloperProfilePage = () => {
               </p>
             )}
 
+            {/* Developer Trust Status Section */}
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              <span className="text-xs font-mono font-semibold text-content-muted mr-1">Developer Status:</span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-accent-emerald/10 text-accent-emerald border border-accent-emerald/20">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Email Verified
+              </span>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-accent-cyan/10 text-accent-cyan border border-accent-cyan/20">
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Developer Verified
+              </span>
+              {developer.verificationLevel === 'TRUSTED' && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-mono font-medium bg-accent-purple/10 text-accent-purple border border-accent-purple/20">
+                  🛡️ Trusted Developer
+                </span>
+              )}
+            </div>
+
+            {/* Trust Disclaimer */}
+            <p className="text-[11px] text-content-muted italic bg-surface-elevated/40 p-2.5 rounded-xl border border-white/5 max-w-2xl mt-2">
+              Developer verification status is based on AppOrbit's configured verification process.
+            </p>
+
             {/* Links and Metadata */}
             <div className="flex flex-wrap items-center gap-6 mt-4 pt-4 border-t border-white/5 text-xs font-mono text-content-dim">
               <div className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-content-muted" />
-                <span>Member since {formatDate(developer.memberSince)}</span>
+                <span>Joined {formatDate(developer.memberSince)}</span>
               </div>
 
               <div className="flex items-center gap-1.5">
                 <Package className="w-4 h-4 text-accent-cyan" />
-                <span>{developer.publishedAppsCount} Published Apps</span>
+                <span>Applications Published: {developer.publishedAppsCount}</span>
               </div>
 
               {developer.website && (
@@ -171,10 +199,10 @@ export const DeveloperProfilePage = () => {
         <div className="flex items-center justify-between pb-4 border-b border-white/5">
           <div>
             <h2 className="text-2xl font-extrabold font-heading text-content-primary">
-              Published Applications
+              Apps by This Developer
             </h2>
             <p className="text-xs text-content-muted mt-1">
-              Public Android packages maintained and distributed by {developer.name}.
+              Public Android applications created and published by {developer.name}.
             </p>
           </div>
           <span className="text-xs font-mono text-content-dim">

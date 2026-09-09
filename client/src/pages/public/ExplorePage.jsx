@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useParams, Link } from 'react-router-dom';
 import {
   Search,
   Filter,
@@ -10,6 +10,7 @@ import {
   ChevronRight,
   RefreshCw,
   SlidersHorizontal,
+  Sparkles,
 } from 'lucide-react';
 import AppCard from '../../components/apps/AppCard';
 import Button from '../../components/ui/Button';
@@ -39,10 +40,11 @@ const SORT_OPTIONS = [
 
 export const ExplorePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
+  const { category: pathCategory } = useParams();
 
   // Read URL query params
   const urlSearch = searchParams.get('search') || '';
-  const urlCategory = searchParams.get('category') || '';
+  const urlCategory = pathCategory || searchParams.get('category') || '';
   const urlPlatform = searchParams.get('platform') || '';
   const urlTech = searchParams.get('technology') || '';
   const urlVerified = searchParams.get('verified') === 'true';
@@ -182,17 +184,41 @@ export const ExplorePage = () => {
     Boolean(selectedTech && selectedTech !== 'All') ||
     verifiedOnly;
 
+  const activeCategoryObj = categories.find(
+    (c) =>
+      c.slug?.toLowerCase() === selectedCategory?.toLowerCase() ||
+      c.name?.toLowerCase() === selectedCategory?.toLowerCase()
+  );
+
   return (
     <div className="max-w-content-max mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-[85vh]">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold font-heading text-content-primary tracking-tight">
-            Explore Android Applications
-          </h1>
-          <p className="text-xs sm:text-sm text-content-muted mt-1 leading-relaxed">
-            Discover vetted native utilities, productivity apps, and tools built by independent developers.
-          </p>
+          {activeCategoryObj ? (
+            <>
+              <div className="flex items-center gap-2 text-xs font-mono text-primary uppercase tracking-wider mb-1">
+                <span>{activeCategoryObj.icon}</span>
+                <span>Category Showcase</span>
+              </div>
+              <h1 className="text-3xl sm:text-4xl font-extrabold font-heading text-content-primary tracking-tight">
+                {activeCategoryObj.name} Applications
+              </h1>
+              <p className="text-xs sm:text-sm text-content-muted mt-1 leading-relaxed">
+                {activeCategoryObj.description ||
+                  `Explore top Android applications in the ${activeCategoryObj.name} category.`}
+              </p>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl sm:text-4xl font-extrabold font-heading text-content-primary tracking-tight">
+                Application Marketplace
+              </h1>
+              <p className="text-xs sm:text-sm text-content-muted mt-1 leading-relaxed">
+                Discover, explore, and download vetted Android applications from trusted developers.
+              </p>
+            </>
+          )}
         </div>
 
         {/* Mobile Filter Toggle & Sort Dropdown */}
@@ -516,9 +542,15 @@ export const ExplorePage = () => {
             </div>
           ) : (
             <EmptyState
-              title="No applications found"
-              description="We couldn't find any applications matching your current search or filter criteria."
-              actionLabel="Clear All Filters"
+              title={selectedCategory ? 'No Apps Yet' : 'No Applications Found'}
+              description={
+                selectedCategory
+                  ? `Be the first developer to publish an app in the ${
+                      activeCategoryObj?.name || selectedCategory
+                    } category.`
+                  : "We couldn't find applications matching your search or filter criteria."
+              }
+              actionLabel={selectedCategory ? 'Clear Category Filter' : 'Clear Filters'}
               onAction={clearAllFilters}
             />
           )}

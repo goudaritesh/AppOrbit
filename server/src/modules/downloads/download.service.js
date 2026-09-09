@@ -6,6 +6,7 @@ import App from '../../models/App.js';
 import AppVersion from '../../models/AppVersion.js';
 import DownloadSession from '../../models/DownloadSession.js';
 import DownloadEvent from '../../models/DownloadEvent.js';
+import Download from '../../models/Download.js';
 import AnalyticsEvent from '../../models/AnalyticsEvent.js';
 
 export class DownloadService {
@@ -63,9 +64,9 @@ export class DownloadService {
 
     // 2. Fetch specific or latest published version
     let version;
-    if (versionId) {
+    if (versionId && mongoose.isValidObjectId(versionId)) {
       version = await AppVersion.findOne({ _id: versionId, app: resolvedAppId });
-    } else if (app.currentVersion) {
+    } else if (app.currentVersion && mongoose.isValidObjectId(app.currentVersion)) {
       version = await AppVersion.findById(app.currentVersion);
     }
 
@@ -219,6 +220,14 @@ export class DownloadService {
           eventType: 'DOWNLOAD_STARTED',
           ipHash: this.hashIp(ip),
         }),
+        Download.create({
+          appId: session.application._id,
+          versionId: session.version._id,
+          userId: session.user || null,
+          downloadedAt: new Date(),
+          ipHash: this.hashIp(ip),
+          userAgent: session.userAgent || '',
+        }).catch((err) => console.warn('[Download] Non-fatal log note:', err.message)),
         AnalyticsEvent.create({
           eventType: 'DOWNLOAD_STARTED',
           application: session.application._id,
