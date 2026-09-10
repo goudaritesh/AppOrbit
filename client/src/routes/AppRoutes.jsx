@@ -18,6 +18,7 @@ import UnauthorizedPage from '../pages/public/UnauthorizedPage';
 // Lazy Loaded Pages (Phase 9 Performance & Code-Splitting)
 const SearchResultsPage = lazy(() => import('../pages/public/SearchResultsPage'));
 const UserDownloadsPage = lazy(() => import('../pages/user/UserDownloadsPage'));
+const ApplicationHubPage = lazy(() => import('../pages/public/ApplicationHubPage'));
 
 // Static Informational Pages (Sprint 6)
 const AboutPage = lazy(() => import('../pages/public/AboutPage'));
@@ -101,6 +102,8 @@ export const AppRoutes = () => {
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/security" element={<SecurityPage />} />
           <Route path="/pricing" element={<DeveloperPricingPage />} />
+          <Route path="/hub" element={<ApplicationHubPage />} />
+          <Route path="/application-hub" element={<ApplicationHubPage />} />
 
           {/* Authentication Routes */}
           <Route path="/login" element={<LoginPage />} />

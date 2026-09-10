@@ -31,6 +31,7 @@ export const Navbar = () => {
   const navLinks = [
     { label: 'Home', path: '/' },
     { label: 'Explore', path: '/explore' },
+    { label: 'Application Hub', path: '/hub' },
     { label: 'Search', path: '/search' },
     { label: 'Categories', path: '/categories' },
   ];
