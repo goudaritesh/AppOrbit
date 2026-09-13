@@ -49,6 +49,12 @@ const startServer = async () => {
         }, 10 * 60 * 1000); // Snapshot every 10 min
       })
       .catch((err) => console.warn('[SystemHealthJob] Init warning:', err.message));
+
+    // Render Free Tier Keep-Alive Ping (Runs every 5 minutes)
+    const selfUrl = process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`;
+    setInterval(() => {
+      fetch(`${selfUrl}/api/health`).catch(() => {});
+    }, 5 * 60 * 1000); 
   });
 
   const server = httpServer;
