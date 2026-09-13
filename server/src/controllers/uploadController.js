@@ -14,6 +14,7 @@ import { ApkHashService } from '../services/apk/apkHashService.js';
 import { storageService } from '../services/storage/storageService.js';
 import { ApkSecurityPipeline } from '../security/apkSecurityPipeline.js';
 import { apkQueue } from '../workers/apkQueue.js';
+import fs from 'fs';
 
 /**
  * Resolves target application document and checks ownership
@@ -234,7 +235,7 @@ export const uploadAppApk = async (req, res, next) => {
       return res.status(404).json({ success: false, message: 'Application not found' });
     }
 
-    if (!req.file || !req.file.buffer) {
+    if (!req.file || !req.file.path) {
       return res.status(400).json({
         success: false,
         code: 'MISSING_FILE',
@@ -242,27 +243,25 @@ export const uploadAppApk = async (req, res, next) => {
       });
     }
 
-    const { originalname, size, mimetype, buffer } = req.file;
+    const { originalname, size, mimetype, path: tempFilePath } = req.file;
 
     // 1. Layered APK validation
     const extCheck = ApkValidationService.validateExtension(originalname);
     if (!extCheck.valid) {
+      fs.unlink(tempFilePath, () => {});
       return res.status(400).json({ success: false, code: 'INVALID_EXTENSION', message: extCheck.error });
     }
 
     const sizeCheck = ApkValidationService.validateFileSize(size);
     if (!sizeCheck.valid) {
+      fs.unlink(tempFilePath, () => {});
       return res.status(400).json({ success: false, code: 'FILE_TOO_LARGE', message: sizeCheck.error });
     }
 
     const mimeCheck = ApkValidationService.validateMimeType(mimetype);
     if (!mimeCheck.valid) {
+      fs.unlink(tempFilePath, () => {});
       return res.status(400).json({ success: false, code: 'INVALID_MIME_TYPE', message: mimeCheck.error });
-    }
-
-    const magicCheck = ApkValidationService.validateMagicBytes(buffer);
-    if (!magicCheck.valid) {
-      return res.status(400).json({ success: false, code: 'MAGIC_BYTES_MISMATCH', message: magicCheck.error });
     }
 
     // BYPASS ALL SYNCHRONOUS HEAVY PARSING TO PREVENT RENDER 100-SECOND LOAD BALANCER TIMEOUTS
@@ -278,11 +277,16 @@ export const uploadAppApk = async (req, res, next) => {
       'quarantine'
     );
 
-    const uploadResult = await storageService.uploadApk({
-      key: quarantineKey,
-      buffer,
-      contentType: 'application/vnd.android.package-archive',
-    });
+    let uploadResult;
+    try {
+      uploadResult = await storageService.uploadApk({
+        key: quarantineKey,
+        stream: fs.createReadStream(tempFilePath),
+        contentType: 'application/vnd.android.package-archive',
+      });
+    } finally {
+      fs.unlink(tempFilePath, () => {}); // Always clean up temporary file
+    }
 
     // Save version metadata in MongoDB with PROCESSING status
     const versionName = req.body?.versionName || req.body?.version || app.version || '1.0.0';

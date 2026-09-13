@@ -1,4 +1,6 @@
 import multer from 'multer';
+import os from 'os';
+import crypto from 'crypto';
 import { FILE_LIMITS } from './fileValidation.js';
 
 // Use MemoryStorage so that buffers can be inspected for magic bytes and security hashes
@@ -23,8 +25,12 @@ const videoMulter = multer({
 });
 
 // 4. APK upload configuration (200MB ceiling)
+// Uses diskStorage to prevent Out-Of-Memory (OOM) crashes on large files
 const apkMulter = multer({
-  storage,
+  storage: multer.diskStorage({
+    destination: os.tmpdir(),
+    filename: (req, file, cb) => cb(null, `apk-upload-${crypto.randomUUID()}-${file.originalname}`)
+  }),
   limits: { fileSize: FILE_LIMITS.APK_MAX_BYTES },
 });
 
