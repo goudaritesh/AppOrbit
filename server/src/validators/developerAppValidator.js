@@ -15,6 +15,16 @@ const isValidWebUrl = (value) => {
 };
 
 /**
+ * Sanitizes image URLs to allow HTTP/HTTPS and base64 data URIs
+ */
+const isValidIconUrl = (value) => {
+  if (!value) return true;
+  const str = String(value).trim().toLowerCase();
+  if (str.startsWith('javascript:')) return false;
+  return /^https?:\/\/.+/.test(str) || str.startsWith('data:image/');
+};
+
+/**
  * Strips restricted fields that developers must never tamper with
  */
 export const stripRestrictedAppFields = (req, res, next) => {
@@ -104,8 +114,8 @@ export const createAppValidation = [
     .withMessage('Individual technology cannot exceed 50 characters'),
   body('icon')
     .optional()
-    .custom(isValidWebUrl)
-    .withMessage('Application icon must be a valid HTTP/HTTPS URL'),
+    .custom(isValidIconUrl)
+    .withMessage('Application icon must be a valid HTTP/HTTPS URL or base64 image'),
   body('githubUrl')
     .optional()
     .custom(isValidWebUrl)
@@ -158,8 +168,8 @@ export const updateAppValidation = [
     .withMessage('Maximum 20 technologies allowed'),
   body('icon')
     .optional()
-    .custom(isValidWebUrl)
-    .withMessage('Application icon must be a valid HTTP/HTTPS URL'),
+    .custom(isValidIconUrl)
+    .withMessage('Application icon must be a valid HTTP/HTTPS URL or base64 image'),
   body('githubUrl')
     .optional()
     .custom(isValidWebUrl)
