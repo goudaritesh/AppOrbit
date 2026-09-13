@@ -301,6 +301,8 @@ export const uploadAppApk = async (req, res, next) => {
       fileName: path.basename(quarantineKey),
       originalFileName: originalname,
       fileSize: size,
+      fileHash: 'PENDING_BACKGROUND_HASH', // Placeholder until ApkProcessingService computes it
+      sha256: 'PENDING_BACKGROUND_HASH',
       storageProvider: uploadResult.storageProvider,
       storageKey: quarantineKey,
       storagePath: uploadResult.storagePath,
