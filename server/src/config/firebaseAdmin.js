@@ -10,7 +10,10 @@ export const initializeFirebaseAdmin = () => {
       // In production, we'd use process.env.GOOGLE_APPLICATION_CREDENTIALS
       // For development, we can mock it or expect the user to provide it.
       // If no credentials are provided, Firebase Admin will attempt to use Application Default Credentials.
-      admin.initializeApp();
+      // We must provide a projectId explicitly so token verification doesn't throw a fatal 500 error in production.
+      admin.initializeApp({
+        projectId: process.env.FIREBASE_PROJECT_ID || 'apporbit-e635d'
+      });
       console.log('[Firebase Admin] Initialized successfully');
     }
   } catch (error) {
