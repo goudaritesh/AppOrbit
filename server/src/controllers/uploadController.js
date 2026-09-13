@@ -13,6 +13,7 @@ import { ApkMetadataService } from '../services/apk/apkMetadataService.js';
 import { ApkHashService } from '../services/apk/apkHashService.js';
 import { storageService } from '../services/storage/storageService.js';
 import { ApkSecurityPipeline } from '../security/apkSecurityPipeline.js';
+import { apkQueue } from '../workers/apkQueue.js';
 
 /**
  * Resolves target application document and checks ownership
@@ -264,51 +265,28 @@ export const uploadAppApk = async (req, res, next) => {
       return res.status(400).json({ success: false, code: 'MAGIC_BYTES_MISMATCH', message: magicCheck.error });
     }
 
-    const archiveCheck = ApkValidationService.inspectArchive(buffer);
-    if (!archiveCheck.valid) {
-      return res.status(400).json({ success: false, code: 'INVALID_ARCHIVE', message: archiveCheck.error });
-    }
+    // BYPASS ALL SYNCHRONOUS HEAVY PARSING TO PREVENT RENDER 100-SECOND LOAD BALANCER TIMEOUTS
+    // The background apkProcessingService will perform inspectArchive, fileHash, scanRes, and extractMetadata!
 
-    // 2. Cryptographic SHA-256 binary hash
-    const fileHash = ApkHashService.hashBuffer(buffer);
-
-    // Sprint 4: Layer 2 & 3 Security scan & signature analysis
-    const scanRes = ApkSecurityPipeline.scanApkBuffer(buffer);
-    const sigInfo = ApkSecurityPipeline.extractSignatureInfo(buffer);
-
-    // 3. Extract APK AndroidManifest metadata
-    let metadata = {};
-    try {
-      metadata = await ApkMetadataService.extractMetadata(buffer);
-    } catch (metaErr) {
-      console.warn('[uploadAppApk] Non-fatal metadata extraction warning:', metaErr.message);
-    }
-
-    // 4. Save binary to private storage
+    // Save binary directly to quarantine storage
     const versionId = crypto.randomUUID();
-    const storageKey = storageService.generateStorageKey(
+    const quarantineKey = storageService.generateStorageKey(
       req.user._id.toString(),
       app._id.toString(),
       versionId,
-      originalname
+      originalname,
+      'quarantine'
     );
 
     const uploadResult = await storageService.uploadApk({
-      key: storageKey,
+      key: quarantineKey,
       buffer,
       contentType: 'application/vnd.android.package-archive',
     });
 
-    // Sprint 4: Move into isolated quarantine storage
-    const quarantineInfo = await ApkSecurityPipeline.moveToQuarantine(
-      app._id,
-      versionId,
-      uploadResult.storagePath
-    );
-
-    // 5. Save version metadata in MongoDB
-    const versionName = metadata?.versionName || req.body?.versionName || req.body?.version || app.version || '1.0.0';
-    const versionCode = metadata?.versionCode || (req.body?.versionCode ? parseInt(req.body.versionCode, 10) : 1);
+    // Save version metadata in MongoDB with PROCESSING status
+    const versionName = req.body?.versionName || req.body?.version || app.version || '1.0.0';
+    const versionCode = req.body?.versionCode ? parseInt(req.body.versionCode, 10) : 1;
 
     const versionDoc = await AppVersion.create({
       app: app._id,
@@ -316,59 +294,50 @@ export const uploadAppApk = async (req, res, next) => {
       versionName,
       versionCode,
       releaseNotes: req.body?.releaseNotes || 'Uploaded via Sprint 4 Security Pipeline',
-      fileName: path.basename(quarantineInfo.storageKey || storageKey),
+      fileName: path.basename(quarantineKey),
       originalFileName: originalname,
       fileSize: size,
-      fileHash,
-      sha256: fileHash,
       storageProvider: uploadResult.storageProvider,
-      storageKey: quarantineInfo.storageKey || storageKey,
-      storagePath: quarantineInfo.storagePath || uploadResult.storagePath,
+      storageKey: quarantineKey,
+      storagePath: uploadResult.storagePath,
       contentType: uploadResult.contentType,
       uploadStatus: 'UPLOADED',
-      processingStatus: 'COMPLETED',
-      securityStatus: scanRes.scanStatus === 'SCAN_PASSED' ? 'PASSED' : 'SUSPICIOUS',
-      downloadStatus: 'DISABLED', // Unscanned/Quarantined APK != Public Download!
+      processingStatus: 'PROCESSING',
+      securityStatus: 'PENDING_SCAN',
+      downloadStatus: 'DISABLED',
       quarantined: true,
-      quarantineReason: 'Awaiting administrative verification and approval',
+      quarantineReason: 'Awaiting background processing and security verification',
       quarantinedAt: new Date(),
-      quarantinedStorageKey: quarantineInfo.storageKey,
-      certificateInfo: sigInfo,
-      signatureStatus: sigInfo.verified ? 'VALID' : 'INVALID',
+      quarantinedStorageKey: quarantineKey,
       isCurrent: true,
-      apkMetadata: metadata,
     });
 
     // Update application record
     app.currentVersion = versionDoc._id;
     app.version = versionName;
-    if (metadata?.packageName) {
-      app.packageName = metadata.packageName;
-    }
     await app.save();
+
+    // Enqueue background processing
+    await apkQueue.addJob({ versionId: versionDoc._id });
 
     return res.status(201).json({
       success: true,
-      message: 'APK uploaded, validated, and placed in secure quarantine for review',
+      message: 'APK uploaded successfully. Background validation and processing has started.',
       data: versionDoc,
       version: versionDoc,
       apk: {
         fileName: originalname,
         version: versionName,
         versionCode,
-        storageKey: quarantineInfo.storageKey || storageKey,
+        storageKey: quarantineKey,
         size,
-        sha256: fileHash,
         quarantined: true,
         securityStatus: versionDoc.securityStatus,
         downloadStatus: versionDoc.downloadStatus,
         uploadedAt: new Date(),
         apkMetadata: {
-          packageName: metadata?.packageName || '',
           versionName,
           versionCode,
-          minSdkVersion: metadata?.minSdkVersion || 21,
-          targetSdkVersion: metadata?.targetSdkVersion || 34,
         },
       },
     });
