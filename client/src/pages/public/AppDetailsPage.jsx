@@ -20,6 +20,7 @@ import {
   Lock,
   MessageSquare,
   Flag,
+  AlertTriangle,
 } from 'lucide-react';
 import Button from '../../components/ui/Button';
 import Card from '../../components/ui/Card';
@@ -45,6 +46,7 @@ import downloadsApi from '../../api/downloadsApi';
 import analyticsApi from '../../api/analyticsApi';
 import { formatDate, formatNumber } from '../../utils/formatters';
 import toast from 'react-hot-toast';
+import { getOrCreateConversation } from '../../services/chatService';
 
 export const AppDetailsPage = () => {
   const { slug } = useParams();
@@ -135,6 +137,46 @@ export const AppDetailsPage = () => {
       toast.error(err.response?.data?.message || 'Failed to submit review');
     } finally {
       setReviewSubmitting(false);
+    }
+  };
+  const handleShare = async () => {
+    const shareData = {
+      title: `${app?.name} on AppOrbit`,
+      text: `Check out ${app?.name} on AppOrbit!`,
+      url: window.location.href,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch (err) {
+        console.error('Error sharing:', err);
+      }
+    } else {
+      navigator.clipboard.writeText(window.location.href);
+      toast.success('Link copied to clipboard!');
+    }
+  };
+
+  const handleMessageDeveloper = async () => {
+    if (!currentUser) {
+      toast.error('Please log in to message the developer.');
+      navigate('/login', { state: { from: location.pathname } });
+      return;
+    }
+    try {
+      const currentUserId = currentUser._id || currentUser.id;
+      const devId = app.developer?._id || app.developer?.id || (typeof app.developer === 'string' ? app.developer : null);
+
+      if (!currentUserId || !devId) {
+        throw new Error('Missing user or developer ID. Cannot start conversation.');
+      }
+
+      const devName = app.developer?.name || app.developer?.companyName || 'Developer';
+      await getOrCreateConversation(currentUserId, devId, currentUser.name || 'User', devName);
+      navigate('/messages');
+    } catch (err) {
+      toast.error('Failed to start conversation');
+      console.error('Conversation Error:', err);
     }
   };
 
@@ -292,6 +334,22 @@ export const AppDetailsPage = () => {
         </div>
       </div>
 
+      {/* SECURITY WARNING BANNER */}
+      {app.currentVersion && 
+       !['PASSED', 'APPROVED'].includes(app.currentVersion.securityStatus) && (
+        <div className="mb-6 p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-start gap-3 text-amber-200/90 shadow-sm">
+          <AlertTriangle className="w-5 h-5 text-amber-400 mt-0.5 flex-shrink-0" />
+          <div className="flex flex-col gap-1">
+            <h4 className="text-sm font-bold font-heading text-amber-400 uppercase tracking-wide">
+              Security Notice
+            </h4>
+            <p className="text-xs leading-relaxed">
+              This version of the application ({app.currentVersion.securityStatus}) has not fully passed automated security verification or is pending manual review. Please proceed with caution.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* 1. HERO IDENTITY CARD */}
       <div className="rounded-3xl bg-surface border border-white/10 p-6 sm:p-8 mb-10 shadow-glass relative overflow-hidden">
         <div className="absolute top-0 right-0 w-80 h-80 bg-primary/10 rounded-full blur-[100px] pointer-events-none" />
@@ -415,6 +473,27 @@ export const AppDetailsPage = () => {
                 Watch Demo
               </Button>
             )}
+
+            <Button
+              variant="outline"
+              size="md"
+              className="w-full"
+              icon={<MessageSquare className="w-4 h-4 text-accent-cyan" />}
+              onClick={handleMessageDeveloper}
+            >
+              Message Developer
+            </Button>
+
+            <Button
+              variant="outline"
+              size="md"
+              className="w-full"
+              icon={<Share2 className="w-4 h-4 text-accent-emerald" />}
+              onClick={handleShare}
+            >
+              Share App
+            </Button>
+
 
             {app.githubUrl && (
               <a

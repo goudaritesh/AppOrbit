@@ -32,7 +32,7 @@ export const AdminSecurityDetailPage = () => {
     try {
       setLoading(true);
       const res = await adminApi.getSecurityReportById(reportId);
-      setReport(res.data?.data?.report || null);
+      setReport(res.data?.report || null);
     } catch (err) {
       console.error('Failed to load security report:', err);
     } finally {

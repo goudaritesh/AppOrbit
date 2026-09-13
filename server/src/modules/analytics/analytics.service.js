@@ -1,11 +1,16 @@
 import mongoose from 'mongoose';
 import AnalyticsEvent from '../../models/AnalyticsEvent.js';
 import ApplicationAnalyticsDaily from '../../models/ApplicationAnalyticsDaily.js';
+import DailyAnalytics from '../../models/DailyAnalytics.js';
 import App from '../../models/App.js';
 import AppVersion from '../../models/AppVersion.js';
 import User from '../../models/User.js';
 import Review from '../../models/Review.js';
 import DownloadEvent from '../../models/DownloadEvent.js';
+import Payment from '../../models/Payment.js';
+import Subscription from '../../models/Subscription.js';
+import SubscriptionPlan from '../../models/SubscriptionPlan.js';
+import SearchHistory from '../../models/SearchHistory.js';
 
 export class AnalyticsService {
   /**
@@ -213,7 +218,15 @@ export class AnalyticsService {
       if (statusCounts[a.status] !== undefined) statusCounts[a.status]++;
     });
 
+    const activeSubscription = await Subscription.findOne({
+      developer: developerId,
+      status: 'ACTIVE',
+    })
+      .populate('plan', 'name tier publishingCredits appLimit')
+      .lean();
+
     return {
+      activeSubscription,
       totalApps,
       totalViews,
       totalDownloads,
@@ -373,24 +386,45 @@ export class AnalyticsService {
    * Retrieves platform-wide health and business KPIs for administrators.
    */
   static async getAdminPlatformAnalytics(timeRange = '30d') {
+    const { startDate } = this.getDateRangeBounds(timeRange);
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
     const [
       totalUsers,
       totalDevelopers,
       totalApps,
       publishedApps,
+      pendingApps,
       downloadAggregates,
       reviewAggregates,
+      revenueResult,
+      monthRevenueResult,
+      activeSubscriptions,
       blockedDownloads,
     ] = await Promise.all([
       User.countDocuments({ role: 'USER' }),
       User.countDocuments({ role: 'DEVELOPER' }),
       App.countDocuments(),
       App.countDocuments({ status: 'PUBLISHED' }),
-      DownloadEvent.countDocuments({ eventType: { $in: ['DOWNLOAD_STARTED', 'DOWNLOAD_COMPLETED'] } }),
+      App.countDocuments({ status: 'PENDING_REVIEW' }),
+      DownloadEvent.countDocuments({
+        eventType: { $in: ['DOWNLOAD_STARTED', 'DOWNLOAD_COMPLETED', 'APP_DOWNLOADED'] },
+      }),
       Review.aggregate([
         { $match: { status: 'ACTIVE' } },
         { $group: { _id: null, total: { $sum: 1 }, avgRating: { $avg: '$rating' } } },
       ]),
+      Payment.aggregate([
+        { $match: { status: 'SUCCESS' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      Payment.aggregate([
+        { $match: { status: 'SUCCESS', createdAt: { $gte: startOfMonth } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      Subscription.countDocuments({ status: 'ACTIVE' }),
       DownloadEvent.countDocuments({ eventType: 'DOWNLOAD_BLOCKED' }),
     ]);
 
@@ -398,22 +432,297 @@ export class AnalyticsService {
     const averagePlatformRating = reviewAggregates[0]?.avgRating
       ? Math.round(reviewAggregates[0].avgRating * 10) / 10
       : 0;
+    const totalRevenue = revenueResult[0]?.total || 0;
+    const revenueThisMonth = monthRevenueResult[0]?.total || 0;
 
     return {
       overview: {
         totalUsers,
         totalDevelopers,
         totalApplications: totalApps,
+        totalApps,
         publishedApplications: publishedApps,
+        publishedApps,
+        pendingApplications: pendingApps,
+        pendingApps,
         totalDownloads: downloadAggregates,
         totalReviews,
         averagePlatformRating,
+        totalRevenue,
+        revenueThisMonth,
+        activeSubscriptions,
       },
       health: {
         blockedDownloads,
         securityViolations: blockedDownloads,
         systemStatus: 'HEALTHY',
       },
+    };
+  }
+
+  /**
+   * Priority 5: Revenue Analytics Module (Integrates with Sprint 8 Payment Data)
+   */
+  static async getRevenueAnalytics(timeRange = '30d') {
+    const { startDate } = this.getDateRangeBounds(timeRange);
+    const startOfMonth = new Date();
+    startOfMonth.setDate(1);
+    startOfMonth.setHours(0, 0, 0, 0);
+
+    const [
+      totalRevenueResult,
+      monthRevenueResult,
+      planBreakdownResult,
+      successfulPaymentsCount,
+      failedPaymentsCount,
+      activeSubscriptionsCount,
+      revenueTimelineResult,
+    ] = await Promise.all([
+      // Total Revenue
+      Payment.aggregate([
+        { $match: { status: 'SUCCESS' } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      // Revenue This Month
+      Payment.aggregate([
+        { $match: { status: 'SUCCESS', createdAt: { $gte: startOfMonth } } },
+        { $group: { _id: null, total: { $sum: '$amount' } } },
+      ]),
+      // Revenue By Plan
+      Payment.aggregate([
+        { $match: { status: 'SUCCESS' } },
+        {
+          $lookup: {
+            from: 'subscriptionplans',
+            localField: 'plan',
+            foreignField: '_id',
+            as: 'planDoc',
+          },
+        },
+        { $unwind: { path: '$planDoc', preserveNullAndEmptyArrays: true } },
+        {
+          $group: {
+            _id: { $toUpper: { $ifNull: ['$planDoc.tier', '$planDoc.name', 'UNKNOWN'] } },
+            totalRevenue: { $sum: '$amount' },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+      Payment.countDocuments({ status: 'SUCCESS' }),
+      Payment.countDocuments({ status: { $in: ['FAILED', 'CANCELLED'] } }),
+      Subscription.countDocuments({ status: 'ACTIVE' }),
+      // Timeline in range
+      Payment.aggregate([
+        { $match: { status: 'SUCCESS', createdAt: { $gte: startDate } } },
+        {
+          $group: {
+            _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+            revenue: { $sum: '$amount' },
+            transactions: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+      ]),
+    ]);
+
+    const totalRevenue = totalRevenueResult[0]?.total || 0;
+    const revenueThisMonth = monthRevenueResult[0]?.total || 0;
+
+    // Standardize plans breakdown (Free ₹0, Silver, Gold, Diamond)
+    const planBreakdown = {
+      FREE: { name: 'Free Trial', amount: 0, count: 0 },
+      SILVER: { name: 'Silver Developer', amount: 0, count: 0 },
+      GOLD: { name: 'Gold Studio', amount: 0, count: 0 },
+      DIAMOND: { name: 'Diamond Enterprise', amount: 0, count: 0 },
+    };
+
+    planBreakdownResult.forEach((item) => {
+      const key = (item._id || '').toUpperCase();
+      if (key.includes('SILVER')) {
+        planBreakdown.SILVER.amount += item.totalRevenue;
+        planBreakdown.SILVER.count += item.count;
+      } else if (key.includes('GOLD')) {
+        planBreakdown.GOLD.amount += item.totalRevenue;
+        planBreakdown.GOLD.count += item.count;
+      } else if (key.includes('DIAMOND')) {
+        planBreakdown.DIAMOND.amount += item.totalRevenue;
+        planBreakdown.DIAMOND.count += item.count;
+      } else if (key.includes('FREE')) {
+        planBreakdown.FREE.count += item.count;
+      }
+    });
+
+    const revenueTimeline = revenueTimelineResult.map((r) => ({
+      date: r._id,
+      revenue: r.revenue,
+      transactions: r.transactions,
+    }));
+
+    return {
+      totalRevenue,
+      revenueThisMonth,
+      successfulPayments: successfulPaymentsCount,
+      failedPayments: failedPaymentsCount,
+      activeSubscriptions: activeSubscriptionsCount,
+      plans: planBreakdown,
+      timeline: revenueTimeline,
+    };
+  }
+
+  /**
+   * Priority 4: User Growth & Acquisition Analytics
+   */
+  static async getUserAnalytics(timeRange = '30d') {
+    const { startDate } = this.getDateRangeBounds(timeRange);
+
+    const [totalUsers, totalDevelopers, newUsersInRange, newDevelopersInRange, dailySignups] =
+      await Promise.all([
+        User.countDocuments({ role: 'USER' }),
+        User.countDocuments({ role: 'DEVELOPER' }),
+        User.countDocuments({ role: 'USER', createdAt: { $gte: startDate } }),
+        User.countDocuments({ role: 'DEVELOPER', createdAt: { $gte: startDate } }),
+        User.aggregate([
+          { $match: { createdAt: { $gte: startDate } } },
+          {
+            $group: {
+              _id: {
+                date: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } },
+                role: '$role',
+              },
+              count: { $sum: 1 },
+            },
+          },
+          { $sort: { '_id.date': 1 } },
+        ]),
+      ]);
+
+    const timelineMap = {};
+    dailySignups.forEach((d) => {
+      const date = d._id.date;
+      if (!timelineMap[date]) {
+        timelineMap[date] = { date, users: 0, developers: 0 };
+      }
+      if (d._id.role === 'DEVELOPER') {
+        timelineMap[date].developers += d.count;
+      } else {
+        timelineMap[date].users += d.count;
+      }
+    });
+
+    return {
+      totalUsers,
+      totalDevelopers,
+      newUsersInRange,
+      newDevelopersInRange,
+      timeline: Object.values(timelineMap).sort((a, b) => a.date.localeCompare(b.date)),
+    };
+  }
+
+  /**
+   * Priority 4: Application Growth & Category Insights
+   */
+  static async getAppAnalyticsSummary(timeRange = '30d') {
+    const { startDate } = this.getDateRangeBounds(timeRange);
+
+    const [
+      totalApps,
+      publishedApps,
+      pendingApps,
+      rejectedApps,
+      categoryDistribution,
+      topDownloadedApps,
+    ] = await Promise.all([
+      App.countDocuments(),
+      App.countDocuments({ status: 'PUBLISHED' }),
+      App.countDocuments({ status: 'PENDING_REVIEW' }),
+      App.countDocuments({ status: 'REJECTED' }),
+      App.aggregate([
+        {
+          $group: {
+            _id: '$category',
+            count: { $sum: 1 },
+            downloads: { $sum: '$downloadCount' },
+            views: { $sum: '$viewCount' },
+          },
+        },
+        { $sort: { count: -1 } },
+      ]),
+      App.find({ status: 'PUBLISHED' })
+        .sort({ downloadCount: -1 })
+        .limit(10)
+        .select('name slug icon downloadCount viewCount ratingAverage category developer')
+        .populate('developer', 'name username')
+        .lean(),
+    ]);
+
+    return {
+      totalApps,
+      publishedApps,
+      pendingApps,
+      rejectedApps,
+      categoryDistribution: categoryDistribution.map((c) => ({
+        category: c._id || 'General',
+        count: c.count,
+        downloads: c.downloads || 0,
+        views: c.views || 0,
+      })),
+      topDownloadedApps: topDownloadedApps.map((a) => ({
+        id: a._id,
+        name: a.name,
+        slug: a.slug,
+        icon: a.icon,
+        category: a.category,
+        downloads: a.downloadCount || 0,
+        views: a.viewCount || 0,
+        rating: a.ratingAverage || 0,
+        developerName: a.developer?.name || 'Developer',
+      })),
+    };
+  }
+
+  /**
+   * Priority 7: Search Insights & Query Volume
+   */
+  static async getSearchAnalytics(timeRange = '30d') {
+    const { startDate } = this.getDateRangeBounds(timeRange);
+
+    // Aggregate from AnalyticsEvent (SEARCH_PERFORMED or SEARCH)
+    const searchEvents = await AnalyticsEvent.aggregate([
+      {
+        $match: {
+          eventType: { $in: ['SEARCH', 'SEARCH_PERFORMED'] },
+          createdAt: { $gte: startDate },
+        },
+      },
+      {
+        $group: {
+          _id: { $toLower: { $ifNull: ['$metadata.query', 'unknown'] } },
+          frequency: { $sum: 1 },
+          zeroResultCount: {
+            $sum: { $cond: [{ $eq: ['$metadata.isZeroResult', true] }, 1, 0] },
+          },
+          lastSearchedAt: { $max: '$createdAt' },
+        },
+      },
+      { $sort: { frequency: -1 } },
+      { $limit: 20 },
+    ]);
+
+    const totalSearches = searchEvents.reduce((acc, s) => acc + s.frequency, 0);
+    const zeroResultsSearches = searchEvents.filter((s) => s.zeroResultCount > 0);
+
+    return {
+      totalSearches,
+      topSearches: searchEvents.map((s) => ({
+        query: s._id,
+        frequency: s.frequency,
+        zeroResults: s.zeroResultCount,
+        lastSearchedAt: s.lastSearchedAt,
+      })),
+      zeroResultQueries: zeroResultsSearches.map((s) => ({
+        query: s._id,
+        frequency: s.zeroResultCount,
+      })),
     };
   }
 }

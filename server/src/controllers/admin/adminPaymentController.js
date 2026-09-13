@@ -6,6 +6,8 @@ import { Invoice } from '../../models/Invoice.js';
 import { PaymentService } from '../../services/payment/paymentService.js';
 import { AuditLogService } from '../../services/admin/auditLogService.js';
 import { NotificationDispatcher } from '../../services/notification/notificationDispatcher.js';
+import ActivityLogService from '../../services/activityLogService.js';
+import EventTrackingService from '../../services/eventTrackingService.js';
 
 /**
  * Admin Payment Management Controller (Phase 7 Production Implementation)
@@ -223,6 +225,30 @@ export const verifyPayment = async (req, res, next) => {
       newState: { status: payment.status },
       severity: decision === 'APPROVED' ? 'INFO' : 'WARNING',
     });
+
+    // Sprint 10 Activity Logging
+    ActivityLogService.logActivity({
+      actorId: req.user._id,
+      actorRole: req.user.role,
+      actorEmail: req.user.email,
+      action: decision === 'APPROVED'
+        ? ActivityLogService.ACTIONS.ADMIN_APPROVED_PAYMENT
+        : ActivityLogService.ACTIONS.ADMIN_REJECTED_PAYMENT,
+      resourceType: 'PAYMENT',
+      resourceId: payment._id,
+      reason: reason.trim() || 'Manual payment review',
+      metadata: { amount: payment.amount, planId: payment.plan?._id || payment.plan },
+      ipAddress: req.ip,
+    }).catch(() => {});
+
+    if (decision === 'APPROVED') {
+      EventTrackingService.trackPaymentSuccess(payment._id, {
+        userId: payment.developer,
+        planId: payment.plan?._id || payment.plan,
+        amount: payment.amount,
+        currency: payment.currency || 'INR',
+      }).catch(() => {});
+    }
 
     return res.status(200).json({
       success: true,

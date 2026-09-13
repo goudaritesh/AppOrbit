@@ -6,6 +6,7 @@ import App from '../../models/App.js';
 import DownloadEvent from '../../models/DownloadEvent.js';
 import Download from '../../models/Download.js';
 import AuditLog from '../../models/AuditLog.js';
+import EventTrackingService from '../../services/eventTrackingService.js';
 import { NotificationDispatcher } from '../../services/notification/notificationDispatcher.js';
 import { NotificationService } from '../../services/admin/notificationService.js';
 
@@ -168,6 +169,12 @@ export class ReviewService {
         data: { appId: app._id, reviewId: review._id, rating: parsedRating },
       }).catch((err) => console.error('[ReviewNotification] Failed to notify developer:', err));
     }
+
+    // 8. Track REVIEW_CREATED analytics event (Sprint 10)
+    EventTrackingService.trackReviewCreated(resolvedAppId, review._id, {
+      userId,
+      rating: parsedRating,
+    }).catch(() => {});
 
     return await Review.findById(review._id).populate('user', 'name username avatar');
   }

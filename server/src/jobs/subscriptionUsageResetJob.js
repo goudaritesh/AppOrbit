@@ -2,8 +2,8 @@ import { Subscription } from '../models/Subscription.js';
 import { NotificationDispatcher } from '../services/notification/notificationDispatcher.js';
 
 /**
- * Subscription Monthly Usage Reset Job (Phase 8 Production Implementation)
- * Resets applicationsUsed counter upon monthly usage cycle reset dates.
+ * Subscription Annual Usage Reset Job (Phase 8 Production Implementation)
+ * Resets applicationsUsed counter upon annual usage cycle reset dates.
  */
 export class SubscriptionUsageResetJob {
   /**
@@ -21,11 +21,13 @@ export class SubscriptionUsageResetJob {
       let resetCount = 0;
 
       for (const sub of overdueResets) {
-        // Advance reset date by 1 month
+        // Advance reset date by 1 year
         const nextReset = new Date(sub.usageResetDate || now);
-        nextReset.setMonth(nextReset.getMonth() + 1);
+        nextReset.setFullYear(nextReset.getFullYear() + 1);
 
-        sub.applicationsUsed = 0;
+        if (!sub.publishingCredits) sub.publishingCredits = { total: sub.publishingCredits?.total || 1, used: 0 };
+        else sub.publishingCredits.used = 0;
+        
         sub.usageResetDate = nextReset;
         await sub.save();
         resetCount++;
@@ -34,8 +36,8 @@ export class SubscriptionUsageResetJob {
         await NotificationDispatcher.dispatchNotification({
           recipientId: sub.developer,
           type: 'SYSTEM',
-          title: 'Monthly Application Quota Refreshed',
-          message: 'Your application publishing quota has been reset for the new billing cycle.',
+          title: 'Annual Application Quota Refreshed',
+          message: 'Your application publishing quota has been reset for the new year.',
           priority: 'LOW',
           data: {
             applicationsUsed: 0,

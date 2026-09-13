@@ -5,6 +5,10 @@ import { Category } from '../../models/Category.js';
 import { AuditLogService } from '../../services/admin/auditLogService.js';
 import { NotificationService } from '../../services/admin/notificationService.js';
 import { ApkSecurityPipeline } from '../../security/apkSecurityPipeline.js';
+import EventTrackingService from '../../services/eventTrackingService.js';
+import ActivityLogService from '../../services/activityLogService.js';
+import { SubscriptionService } from '../../services/subscription/subscriptionService.js';
+import { storageService } from '../../services/storage/storageService.js';
 
 /**
  * 7-Point Mandatory Approval Gate (Sprint 5)
@@ -188,11 +192,11 @@ export const approveApp = async (req, res, next) => {
 
     // 3. Promote APK out of quarantine into approved storage
     try {
-      const quarantinePath = version.quarantinePath || version.storagePath;
+      const currentKey = version.storageKey;
       const promoteResult = await ApkSecurityPipeline.promoteToApproved(
         app._id,
         version._id,
-        quarantinePath
+        currentKey
       );
       version.storageKey = promoteResult.storageKey || version.storageKey;
       version.storagePath = promoteResult.storagePath || version.storagePath;
@@ -204,11 +208,30 @@ export const approveApp = async (req, res, next) => {
     const previousStatus = app.status;
     const newStatus = publishImmediately ? 'PUBLISHED' : 'APPROVED';
 
+    // Safely delete the old APK if we are updating to a new version
+    if (app.currentVersion && app.currentVersion._id.toString() !== version._id.toString()) {
+      try {
+        const oldVersion = await AppVersion.findById(app.currentVersion._id);
+        if (oldVersion && oldVersion.storageKey) {
+          await storageService.deleteApk({ key: oldVersion.storageKey });
+          oldVersion.uploadStatus = 'DELETED';
+          await oldVersion.save();
+        }
+      } catch (cleanupErr) {
+        console.error('[approveApp] Failed to cleanup old APK version:', cleanupErr.message);
+      }
+    }
+
     app.status = newStatus;
     app.visibility = publishImmediately ? 'PUBLIC' : 'PRIVATE';
+    
+    // First-time publish logic
     if (publishImmediately && !app.publishedAt) {
       app.publishedAt = new Date();
+      // Consume 1 Publishing Credit
+      await SubscriptionService.consumePublishingCredit(app.developer._id || app.developer, app._id);
     }
+    
     app.currentVersion = version._id;
 
     version.quarantined = false;
@@ -241,6 +264,25 @@ export const approveApp = async (req, res, next) => {
       previousState: { status: previousStatus },
       newState: { status: newStatus, versionId: version._id },
     });
+
+    // Sprint 10 Event Tracking & Activity Logging
+    EventTrackingService.track(EventTrackingService.EVENT_TYPES.APP_APPROVED, {
+      appId: app._id,
+      userId: req.user._id,
+      metadata: { notes, newStatus },
+    }).catch(() => {});
+
+    ActivityLogService.logActivity({
+      actorId: req.user._id,
+      actorRole: req.user.role,
+      actorEmail: req.user.email,
+      action: ActivityLogService.ACTIONS.ADMIN_APPROVED_APP,
+      resourceType: 'APP',
+      resourceId: app._id,
+      reason: notes || 'Approved application release',
+      metadata: { versionId: version._id, newStatus },
+      ipAddress: req.ip,
+    }).catch(() => {});
 
     return res.status(200).json({
       success: true,
@@ -314,6 +356,19 @@ export const rejectApp = async (req, res, next) => {
       version.securityStatus = 'REJECTED';
       version.downloadStatus = 'BLOCKED';
       version.quarantineReason = reason.trim() || 'Rejected during administrative review';
+      
+      try {
+        const rejectedResult = await ApkSecurityPipeline.moveToRejected(
+          app._id,
+          version._id,
+          version.storageKey
+        );
+        version.storageKey = rejectedResult.storageKey || version.storageKey;
+        version.storagePath = rejectedResult.storagePath || version.storagePath;
+      } catch (rejectMoveErr) {
+        console.warn('[rejectApp] Non-fatal rejected promotion note:', rejectMoveErr.message);
+      }
+      
       await version.save();
     }
 
@@ -328,6 +383,19 @@ export const rejectApp = async (req, res, next) => {
       newState: { status: 'REJECTED', category },
       severity: 'WARNING',
     });
+
+    ActivityLogService.logActivity({
+      actorId: req.user._id,
+      actorRole: req.user.role,
+      actorEmail: req.user.email,
+      action: ActivityLogService.ACTIONS.ADMIN_REJECTED_APP,
+      resourceType: 'APP',
+      resourceId: app._id,
+      reason: reason.trim(),
+      metadata: { category },
+      ipAddress: req.ip,
+      severity: 'WARNING',
+    }).catch(() => {});
 
     return res.status(200).json({
       success: true,

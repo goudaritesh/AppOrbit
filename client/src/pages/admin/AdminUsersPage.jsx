@@ -29,8 +29,8 @@ export const AdminUsersPage = () => {
         search: search.trim() || undefined,
       };
       const res = await adminApi.getUsers(params);
-      setUsers(res.data?.data?.users || []);
-      setPagination(res.data?.data?.pagination || { page: 1, pages: 1, total: 0 });
+      setUsers(res.data?.users || []);
+      setPagination(res.data?.pagination || { page: 1, pages: 1, total: 0 });
     } catch (err) {
       console.error('Failed to load users:', err);
     } finally {

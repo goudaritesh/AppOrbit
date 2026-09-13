@@ -6,6 +6,7 @@ import {
   getUserDownloads,
 } from './download.controller.js';
 import { protect, optionalAuth } from '../../middleware/authMiddleware.js';
+import { downloadRateLimiter } from '../../middleware/rateLimitMiddleware.js';
 
 const router = Router();
 
@@ -26,7 +27,7 @@ export default router;
    APP-NESTED DOWNLOAD HELPER
    ========================================== */
 export const appDownloadRouter = Router({ mergeParams: true });
-appDownloadRouter.post('/', optionalAuth, initiateDownload);
+appDownloadRouter.post('/', optionalAuth, downloadRateLimiter, initiateDownload);
 
 /* ==========================================
    USER DOWNLOAD HISTORY ROUTER (/api/me/downloads)

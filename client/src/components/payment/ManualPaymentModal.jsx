@@ -13,7 +13,7 @@ export const ManualPaymentModal = ({ plan, isOpen, onClose, onSuccess }) => {
 
   if (!isOpen || !plan) return null;
 
-  const upiId = 'apporbit.corp@upi';
+  const upiId = '7848901211@ptsbi';
   const priceFormatted = new Intl.NumberFormat('en-IN', {
     style: 'currency',
     currency: plan.currency || 'INR',
@@ -109,14 +109,9 @@ export const ManualPaymentModal = ({ plan, isOpen, onClose, onSuccess }) => {
 
             {/* QR Code + UPI Box */}
             <div className="p-4 rounded-2xl bg-surface border border-white/5 flex flex-col sm:flex-row items-center gap-4">
-              {/* Simulated QR Code representation */}
-              <div className="w-32 h-32 rounded-xl bg-white p-2 shrink-0 flex items-center justify-center shadow-inner">
-                <div className="w-full h-full border-4 border-dashed border-gray-800 rounded flex flex-col items-center justify-center p-1 text-center">
-                  <QrCode className="w-12 h-12 text-gray-900" />
-                  <span className="text-[8px] font-mono font-bold text-gray-900 mt-1">
-                    APPORBIT UPI
-                  </span>
-                </div>
+              {/* QR Code representation */}
+              <div className="w-48 h-48 rounded-xl bg-white shrink-0 flex items-center justify-center shadow-inner overflow-hidden relative">
+                <img src="/qr.png" alt="Payment QR Code" className="w-full h-full object-cover object-center scale-[1.4]" />
               </div>
 
               <div className="flex-1 space-y-2 text-center sm:text-left">

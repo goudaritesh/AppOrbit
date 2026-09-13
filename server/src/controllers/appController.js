@@ -16,6 +16,8 @@ const escapeRegex = (string) => {
  */
 const SORT_OPTIONS = {
   popular: { downloadCount: -1, ratingAverage: -1 },
+  trending: { downloadCount: -1, updatedAt: -1 },
+  top_rated: { ratingAverage: -1, ratingCount: -1 },
   recent: { publishedAt: -1, createdAt: -1 },
   rating: { ratingAverage: -1, ratingCount: -1 },
   downloads: { downloadCount: -1 },
@@ -33,7 +35,7 @@ export const getApps = async (req, res, next) => {
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit, 10) || 12));
     const skip = (page - 1) * limit;
 
-    const { search, category, platform, technology, verified, sort } = req.query;
+    const { search, category, platform, technology, verified, sort, filter, badge } = req.query;
 
     // Strict public visibility barrier: never expose draft, unlisted or private apps
     const query = {
@@ -97,6 +99,23 @@ export const getApps = async (req, res, next) => {
     // 5. Verification Filter
     if (verified === 'true' || verified === '1') {
       query.verificationStatus = 'VERIFIED';
+    }
+
+    // 5.5 Sprint 13 Discovery Filters (student_projects, featured, trending, top_rated)
+    if (filter === 'student_projects') {
+      query.$or = [{ isStudentProject: true }, { badge: 'STUDENT_PROJECT' }];
+    } else if (filter === 'featured') {
+      query.$or = [{ featured: true }, { badge: 'FEATURED' }];
+    } else if (filter === 'trending') {
+      query.$or = [{ badge: 'TRENDING' }, { downloadCount: { $gte: 1 } }];
+    } else if (filter === 'editors_choice') {
+      query.badge = 'EDITORS_CHOICE';
+    } else if (filter === 'top_rated') {
+      query.ratingAverage = { $gte: 4.0 };
+    }
+
+    if (badge && badge !== 'ALL') {
+      query.badge = badge.toUpperCase();
     }
 
     // 6. Whitelisted Sorting
@@ -332,6 +351,38 @@ export const getRelatedApps = async (req, res, next) => {
       data: {
         apps: related.map(serializePublicApp),
       },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Admin: Toggle featured status and assign badges
+ * @route   PATCH /api/v1/admin/apps/:id/feature
+ * @access  Admin
+ */
+export const featureApp = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { featured, badge, isStudentProject, featuredOrder } = req.body;
+
+    const app = await App.findById(id);
+    if (!app) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+
+    if (featured !== undefined) app.featured = Boolean(featured);
+    if (badge !== undefined) app.badge = badge;
+    if (isStudentProject !== undefined) app.isStudentProject = Boolean(isStudentProject);
+    if (featuredOrder !== undefined) app.featuredOrder = Number(featuredOrder) || 0;
+
+    await app.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Application feature status updated successfully',
+      data: serializePublicApp(app),
     });
   } catch (error) {
     next(error);

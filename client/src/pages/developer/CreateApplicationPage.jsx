@@ -71,6 +71,7 @@ export const CreateApplicationPage = () => {
     demoVideo: { url: '', type: 'youtube', provider: 'youtube' },
     githubUrl: '',
     demoUrl: '',
+    externalApkUrl: '',
   });
 
   // Intermediate input states for arrays
@@ -903,6 +904,25 @@ export const CreateApplicationPage = () => {
                   className="px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
                 />
               </div>
+            </div>
+
+            {/* Zero-Cost External Hosting */}
+            <div className="pt-4 border-t border-white/5 flex flex-col gap-1.5">
+              <label className="text-xs font-semibold text-content-primary flex items-center justify-between">
+                <span>External APK Download URL <span className="text-primary">*</span></span>
+                <span className="text-[10px] text-content-muted font-normal bg-primary/10 text-primary px-2 py-0.5 rounded">Zero-Cost MVP Architecture</span>
+              </label>
+              <input
+                type="url"
+                required
+                value={formData.externalApkUrl}
+                onChange={(e) => updateField('externalApkUrl', e.target.value)}
+                placeholder="https://drive.google.com/file/d/... or https://github.com/releases/..."
+                className="px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary w-full"
+              />
+              <p className="text-[10px] text-content-secondary mt-1">
+                Provide a direct download link to your APK hosted externally (e.g., GitHub Releases, Google Drive). This avoids platform bandwidth fees.
+              </p>
             </div>
           </div>
         )}

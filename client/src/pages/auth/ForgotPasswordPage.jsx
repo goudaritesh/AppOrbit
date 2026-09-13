@@ -37,7 +37,7 @@ export const ForgotPasswordPage = () => {
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2.5 mb-4 group">
             <div className="w-10 h-10 rounded-xl bg-surface border border-white/10 flex items-center justify-center p-2 shadow-sm group-hover:border-primary/50 transition-colors">
-              <img src="/logo.svg" alt="AppOrbit" className="w-full h-full object-contain" />
+              <img src="/logo.png" alt="AppOrbit" className="w-full h-full object-cover" />
             </div>
           </Link>
           <h1 className="text-2xl font-bold font-heading text-content-primary tracking-tight">

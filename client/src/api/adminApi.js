@@ -75,12 +75,59 @@ export const adminApi = {
   markNotificationAsRead: (id) => apiClient.patch(`/admin/notifications/${id}/read`),
   markAllNotificationsAsRead: () => apiClient.post('/admin/notifications/read-all'),
 
-  // Audit Logs
+  // Audit Logs & Activity Logs
   getAuditLogs: (params = {}) => apiClient.get('/admin/audit-logs', { params }),
+  getActivityLogs: (params = {}) => apiClient.get('/admin/activity-logs', { params }),
 
   // Platform Settings & Maintenance
   getSettings: () => apiClient.get('/admin/settings'),
   updateSettings: (data) => apiClient.put('/admin/settings', data),
+
+  // Sprint 10 Deep Analytics & Observability
+  getPlatformAnalytics: (range = '30d') => apiClient.get(`/admin/analytics?range=${range}`),
+  getRevenueAnalytics: (range = '30d') => apiClient.get(`/admin/analytics/revenue?range=${range}`),
+  getUserAnalytics: (range = '30d') => apiClient.get(`/admin/analytics/users?range=${range}`),
+  getAppAnalytics: (range = '30d') => apiClient.get(`/admin/analytics/apps?range=${range}`),
+  getSearchAnalytics: (range = '30d') => apiClient.get(`/admin/analytics/search?range=${range}`),
+  getSystemHealth: () => apiClient.get('/admin/system-health'),
+  triggerDailyAggregation: (date) => apiClient.post('/admin/analytics/aggregate', { date }),
+
+  // Sprint 12 Beta Program & User Testing
+  getBetaAnalytics: () => apiClient.get('/admin/beta/analytics'),
+  getBugReports: (params = {}) => apiClient.get('/bugs', { params }),
+  updateBugReport: (id, data) => apiClient.patch(`/bugs/${id}`, data),
+  getFeedbacks: (params = {}) => apiClient.get('/feedback', { params }),
+  updateFeedback: (id, data) => apiClient.patch(`/feedback/${id}`, data),
+  getIncidents: (params = {}) => apiClient.get('/admin/beta/incidents', { params }),
+  createIncident: (data) => apiClient.post('/admin/beta/incidents', data),
+  updateIncident: (id, data) => apiClient.patch(`/admin/beta/incidents/${id}`, data),
+
+  // Public / User Beta Actions
+  submitPublicFeedback: (data) => apiClient.post('/feedback', data),
+  submitPublicBug: (data) => apiClient.post('/bugs', data),
+
+  // Sprint 13 Public Beta, Growth, Referrals & Waitlist
+  getGrowthAnalytics: () => apiClient.get('/admin/growth/analytics'),
+  getWaitlist: (params = {}) => apiClient.get('/waitlist', { params }),
+  getWaitlistSummary: () => apiClient.get('/waitlist/summary'),
+  joinWaitlist: (data) => apiClient.post('/waitlist', data),
+  getMyReferralCode: () => apiClient.get('/referrals/code'),
+  getMyReferrals: () => apiClient.get('/referrals/me'),
+  validateInviteCode: (code) => apiClient.post('/referrals/validate', { code }),
+  getAdminReferrals: (params = {}) => apiClient.get('/referrals/admin', { params }),
+  getFeaturedApps: (limit = 6) => apiClient.get(`/apps/featured?limit=${limit}`),
+  featureApp: (id, data) => apiClient.patch(`/admin/apps/${id}/feature`, data),
+  // Added missing admin endpoints
+  getAdminReviews: (params = {}) => apiClient.get('/admin/reviews', { params }),
+  moderateReview: (reviewId, data) => apiClient.patch(`/admin/reviews/${reviewId}/moderate`, data),
+  getAdminSecurityReport: (appId) => apiClient.get(`/admin/apps/${appId}/security`),
+  approvePayment: (paymentId, data) => apiClient.patch(`/admin/payments/${paymentId}/approve`, data),
+  rejectPayment: (paymentId, data) => apiClient.patch(`/admin/payments/${paymentId}/reject`, data),
+  deleteSubscriptionPlan: (planId) => apiClient.delete(`/admin/subscriptions/plans/${planId}`),
+  getPlatformSettings: () => apiClient.get('/admin/settings'),
+  updatePlatformSettings: (data) => apiClient.put('/admin/settings', data),
+  globalAdminSearch: (q) => apiClient.get(`/admin/search?q=${encodeURIComponent(q)}`),
+  // End of added endpoints
 };
 
 export default adminApi;

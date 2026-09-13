@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useDispatch } from 'react-redux';
 import toast from 'react-hot-toast';
 import {
   User as UserIcon,
@@ -14,19 +15,26 @@ import {
 } from 'lucide-react';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
+import { GoogleLogin } from '@react-oauth/google';
 import { authApi } from '../../api/authApi';
+import { setCredentials } from '../../store/slices/authSlice';
+import { auth, createUserWithEmailAndPassword, sendEmailVerification } from '../../config/firebase';
 
 export const SignupPage = () => {
-  const [accountType, setAccountType] = useState('USER');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [role, setRole] = useState('USER');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [createdEmail, setCreatedEmail] = useState('');
   const [isResending, setIsResending] = useState(false);
+
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -51,20 +59,20 @@ export const SignupPage = () => {
       return;
     }
 
+    if (!email.toLowerCase().endsWith('@gmail.com')) {
+      toast.error('Registration is restricted to valid @gmail.com accounts only.');
+      return;
+    }
+
     setIsLoading(true);
     try {
-      const response = await authApi.signup({
-        name,
-        email,
-        password,
-        role: accountType,
-      });
+      await authApi.signup({ name, email, password, role });
 
       setCreatedEmail(email);
       setIsSuccess(true);
-      toast.success(response.message || 'Account created successfully!');
+      toast.success('Account created! Please verify your email.');
     } catch (err) {
-      toast.error(err.message || 'Registration failed. Please check your details.');
+      toast.error(err.response?.data?.message || err.message || 'Registration failed.');
     } finally {
       setIsLoading(false);
     }
@@ -83,14 +91,40 @@ export const SignupPage = () => {
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    if (!agreeTerms) {
+      toast.error('Please agree to the Platform Terms and Distribution Guidelines.');
+      return;
+    }
+    
+    setIsLoading(true);
+    try {
+      const response = await authApi.googleLogin({
+        credential: credentialResponse.credential,
+        role,
+      });
+      const { accessToken, user } = response.data;
+
+      dispatch(setCredentials({ accessToken, user }));
+      toast.success(`Welcome to AppOrbit, ${user.name.split(' ')[0]}!`);
+
+      const from = location.state?.from?.pathname || (user.role === 'DEVELOPER' ? '/developer/dashboard' : '/admin/dashboard');
+      navigate(from, { replace: true });
+    } catch (err) {
+      toast.error(err.message || 'Google authentication failed.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   return (
-    <div className="min-h-[85vh] flex items-center justify-center px-4 py-12">
+    <div className="min-h-[80vh] flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         {/* Brand Banner */}
         <div className="text-center mb-6">
           <Link to="/" className="inline-flex items-center gap-2.5 mb-4 group">
             <div className="w-10 h-10 rounded-xl bg-surface border border-white/10 flex items-center justify-center p-2 shadow-sm group-hover:border-primary/50 transition-colors">
-              <img src="/logo.svg" alt="AppOrbit" className="w-full h-full object-contain" />
+              <img src="/logo.png" alt="AppOrbit" className="w-full h-full object-cover" />
             </div>
           </Link>
           <h1 className="text-2xl font-bold font-heading text-content-primary tracking-tight">
@@ -142,49 +176,45 @@ export const SignupPage = () => {
             </div>
           ) : (
             <>
-              {/* Account Type Selection Tabs */}
-              <div className="grid grid-cols-2 p-1 rounded-xl bg-surface-elevated border border-white/5 mb-6 text-xs font-semibold">
-                <button
-                  type="button"
-                  onClick={() => setAccountType('USER')}
-                  className={`py-2 rounded-lg flex items-center justify-center gap-2 transition-all ${
-                    accountType === 'USER'
-                      ? 'bg-primary text-white shadow-glow'
-                      : 'text-content-muted hover:text-white'
-                  }`}
-                >
-                  <UserIcon className="w-3.5 h-3.5" />
-                  <span>User</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAccountType('DEVELOPER')}
-                  className={`py-2 rounded-lg flex items-center justify-center gap-2 transition-all ${
-                    accountType === 'DEVELOPER'
-                      ? 'bg-primary text-white shadow-glow'
-                      : 'text-content-muted hover:text-white'
-                  }`}
-                >
-                  <Terminal className="w-3.5 h-3.5" />
-                  <span>Developer</span>
-                </button>
-              </div>
-
-              <p className="text-[11px] text-content-dim mb-4 text-center">
-                {accountType === 'DEVELOPER'
-                  ? 'Publish APKs, manage release channels, and access developer metrics.'
-                  : 'Discover verified applications, download APKs, and write reviews.'}
-              </p>
-
               <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                
                 <Input
-                  label="Full Name or Studio Name"
-                  placeholder={accountType === 'DEVELOPER' ? 'AuraHealth Labs' : 'Ritesh Kumar'}
+                  label="Full Name"
+                  type="text"
+                  placeholder="John Doe"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   icon={<UserIcon className="w-4 h-4" />}
                 />
+
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-semibold text-content-primary">Account Type</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 text-xs text-content-primary cursor-pointer">
+                      <input
+                        type="radio"
+                        name="role"
+                        value="USER"
+                        checked={role === 'USER'}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="accent-primary"
+                      />
+                      Standard User
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-content-primary cursor-pointer">
+                      <input
+                        type="radio"
+                        name="role"
+                        value="DEVELOPER"
+                        checked={role === 'DEVELOPER'}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="accent-primary"
+                      />
+                      Developer
+                    </label>
+                  </div>
+                </div>
 
                 <Input
                   label="Email Address"
@@ -237,9 +267,26 @@ export const SignupPage = () => {
                   className="w-full justify-center mt-2"
                   icon={<ArrowRight className="w-4 h-4" />}
                 >
-                  Register as {accountType === 'DEVELOPER' ? 'Developer' : 'User'}
+                  Register Account
                 </Button>
               </form>
+
+              <div className="mt-6 mb-6 relative flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center border-t border-white/10"></div>
+                <span className="relative z-10 px-3 bg-surface text-xs font-mono text-content-dim">OR</span>
+              </div>
+
+              <div className="flex justify-center w-full mb-4">
+                <GoogleLogin
+                  onSuccess={handleGoogleSuccess}
+                  onError={() => toast.error('Google signup was unsuccessful. Please try again.')}
+                  useOneTap
+                  theme="filled_black"
+                  shape="pill"
+                  text="signup_with"
+                  width="100%"
+                />
+              </div>
 
               <div className="mt-6 pt-6 border-t border-white/5 text-center text-xs text-content-muted">
                 Already have an account?{' '}

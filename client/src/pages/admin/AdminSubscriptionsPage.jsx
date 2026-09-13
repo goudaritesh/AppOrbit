@@ -34,8 +34,8 @@ const AdminSubscriptionsPage = () => {
     try {
       setLoadingPlans(true);
       const res = await adminApi.getSubscriptionPlans();
-      if (res.data?.success) {
-        setPlans(res.data.data.plans || []);
+      if (res.success) {
+        setPlans(res.data.plans || []);
       }
     } catch (err) {
       console.error('Failed to load plans:', err);
@@ -57,9 +57,9 @@ const AdminSubscriptionsPage = () => {
         plan: filters.plan !== 'ALL' ? filters.plan : undefined,
       };
       const res = await adminApi.getDeveloperSubscriptions(params);
-      if (res.data?.success) {
-        setSubscriptions(res.data.data.subscriptions || []);
-        setPagination(res.data.data.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
+      if (res.success) {
+        setSubscriptions(res.data.subscriptions || []);
+        setPagination(res.data.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
       }
     } catch (err) {
       console.error('Failed to load subscriptions:', err);
@@ -110,7 +110,7 @@ const AdminSubscriptionsPage = () => {
       };
 
       const res = await adminApi.manualUpdateSubscription(devId, payload);
-      if (res.data?.success) {
+      if (res.success) {
         toast.success('Developer subscription updated successfully');
         setIsUpdateModalOpen(false);
         fetchSubscriptions(pagination.page);

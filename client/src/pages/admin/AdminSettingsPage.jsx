@@ -27,8 +27,8 @@ const AdminSettingsPage = () => {
     try {
       setLoading(true);
       const res = await adminApi.getSettings();
-      if (res.data?.success) {
-        setSettings(res.data.data.settings);
+      if (res.success) {
+        setSettings(res.data.settings);
       }
     } catch (err) {
       console.error('Failed to load platform settings:', err);
@@ -65,9 +65,9 @@ const AdminSettingsPage = () => {
         ...settings,
         reason: reason.trim()
       });
-      if (res.data?.success) {
+      if (res.success) {
         toast.success('Platform settings updated successfully');
-        setSettings(res.data.data.settings);
+        setSettings(res.data.settings);
         setReason('');
       }
     } catch (err) {

@@ -92,6 +92,22 @@ export const AppCard = ({ app, featured = false }) => {
               <span>•</span>
               <span className="text-content-dim">v{version}</span>
             </div>
+
+            {/* Sprint 13 Badges */}
+            {((app.badge && app.badge !== 'NONE') || app.isStudentProject) && (
+              <div className="flex items-center gap-1.5 flex-wrap mt-1.5">
+                {app.badge && app.badge !== 'NONE' && (
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold uppercase bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                    {app.badge.replace('_', ' ')}
+                  </span>
+                )}
+                {app.isStudentProject && (
+                  <span className="px-1.5 py-0.2 rounded text-[9px] font-mono font-bold bg-purple-500/15 text-purple-300 border border-purple-500/30">
+                    🎓 Student Project
+                  </span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

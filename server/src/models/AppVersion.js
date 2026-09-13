@@ -172,6 +172,11 @@ const appVersionSchema = new mongoose.Schema(
       default: 'UNKNOWN',
       index: true,
     },
+    permissionRisks: {
+      high: { type: [String], default: [] },
+      medium: { type: [String], default: [] },
+      low: { type: [String], default: [] },
+    },
     securityReport: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'SecurityReport',
@@ -238,8 +243,15 @@ const appVersionSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true },
   }
 );
+
+// Virtual field compatibility alias: apkHash -> fileHash
+appVersionSchema.virtual('apkHash').get(function () {
+  return this.fileHash || this.sha256;
+});
 
 // Compound Unique Index: Only completed versions enforce unique version codes per app
 appVersionSchema.index(

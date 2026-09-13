@@ -10,15 +10,16 @@ import DashboardLayout from '../components/layout/DashboardLayout';
 import HomePage from '../pages/public/HomePage';
 import ExplorePage from '../pages/public/ExplorePage';
 import AppDetailsPage from '../pages/public/AppDetailsPage';
-import CategoriesPage from '../pages/public/CategoriesPage';
 import DeveloperProfilePage from '../pages/public/DeveloperProfilePage';
 import NotFoundPage from '../pages/public/NotFoundPage';
 import UnauthorizedPage from '../pages/public/UnauthorizedPage';
 
 // Lazy Loaded Pages (Phase 9 Performance & Code-Splitting)
-const SearchResultsPage = lazy(() => import('../pages/public/SearchResultsPage'));
 const UserDownloadsPage = lazy(() => import('../pages/user/UserDownloadsPage'));
-const ApplicationHubPage = lazy(() => import('../pages/public/ApplicationHubPage'));
+const MessagesPage = lazy(() => import('../pages/user/MessagesPage'));
+const CommunityPage = lazy(() => import('../pages/public/CommunityPage'));
+const PublicBetaLandingPage = lazy(() => import('../pages/public/PublicBetaLandingPage'));
+const PressKitPage = lazy(() => import('../pages/public/PressKitPage'));
 
 // Static Informational Pages (Sprint 6)
 const AboutPage = lazy(() => import('../pages/public/AboutPage'));
@@ -33,6 +34,7 @@ const SignupPage = lazy(() => import('../pages/auth/SignupPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/auth/ForgotPasswordPage'));
 const ResetPasswordPage = lazy(() => import('../pages/auth/ResetPasswordPage'));
 const VerifyEmailPage = lazy(() => import('../pages/auth/VerifyEmailPage'));
+const CompleteProfilePage = lazy(() => import('../pages/auth/CompleteProfilePage'));
 
 // User Profile
 const UserProfilePage = lazy(() => import('../pages/user/UserProfilePage'));
@@ -76,6 +78,15 @@ const AdminAuditLogsPage = lazy(() => import('../pages/admin/AdminAuditLogsPage'
 const AdminSettingsPage = lazy(() => import('../pages/admin/AdminSettingsPage'));
 const AdminSearchPage = lazy(() => import('../pages/admin/AdminSearchPage'));
 const AdminReviewsPage = lazy(() => import('../pages/admin/AdminReviewsPage'));
+const AdminSystemHealthPage = lazy(() => import('../pages/admin/AdminSystemHealthPage'));
+const AdminBetaDashboardPage = lazy(() => import('../pages/admin/AdminBetaDashboardPage'));
+const AdminGrowthDashboardPage = lazy(() => import('../pages/admin/AdminGrowthDashboardPage'));
+
+// Sprint 13 Developer Growth Pages
+const DeveloperReferralPage = lazy(() => import('../pages/developer/DeveloperReferralPage'));
+
+// Sprint 13 Public Pages
+const FeaturedAppsPage = lazy(() => import('../pages/public/FeaturedAppsPage'));
 
 // Guards
 import ProtectedRoute from './ProtectedRoute';
@@ -89,26 +100,30 @@ export const AppRoutes = () => {
         <Route element={<PublicLayout />}>
           <Route path="/" element={<HomePage />} />
           <Route path="/explore" element={<ExplorePage />} />
+          <Route path="/community" element={<CommunityPage />} />
           <Route path="/apps" element={<ExplorePage />} />
           <Route path="/apps/:slug" element={<AppDetailsPage />} />
-          <Route path="/categories" element={<CategoriesPage />} />
           <Route path="/categories/:category" element={<ExplorePage />} />
           <Route path="/developers/:username" element={<DeveloperProfilePage />} />
           <Route path="/developers/:id" element={<DeveloperProfilePage />} />
-          <Route path="/search" element={<SearchResultsPage />} />
           <Route path="/about" element={<AboutPage />} />
           <Route path="/contact" element={<ContactPage />} />
           <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
           <Route path="/terms" element={<TermsPage />} />
           <Route path="/security" element={<SecurityPage />} />
           <Route path="/pricing" element={<DeveloperPricingPage />} />
-          <Route path="/hub" element={<ApplicationHubPage />} />
-          <Route path="/application-hub" element={<ApplicationHubPage />} />
+          <Route path="/beta" element={<PublicBetaLandingPage />} />
+          <Route path="/public-beta" element={<PublicBetaLandingPage />} />
+          <Route path="/press" element={<PressKitPage />} />
+          <Route path="/press-kit" element={<PressKitPage />} />
+          <Route path="/invite/:code" element={<SignupPage />} />
+          <Route path="/featured" element={<FeaturedAppsPage />} />
 
           {/* Authentication Routes */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/signup" element={<SignupPage />} />
           <Route path="/register" element={<SignupPage />} />
+          <Route path="/complete-profile" element={<CompleteProfilePage />} />
           <Route path="/forgot-password" element={<ForgotPasswordPage />} />
           <Route path="/reset-password" element={<ResetPasswordPage />} />
           <Route path="/verify-email" element={<VerifyEmailPage />} />
@@ -127,6 +142,14 @@ export const AppRoutes = () => {
             element={
               <ProtectedRoute>
                 <UserDownloadsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/messages"
+            element={
+              <ProtectedRoute>
+                <MessagesPage />
               </ProtectedRoute>
             }
           />
@@ -160,6 +183,7 @@ export const AppRoutes = () => {
           }
         >
           <Route index element={<DeveloperDashboardPage />} />
+          <Route path="messages" element={<MessagesPage />} />
           <Route path="apps" element={<DeveloperAppsPage />} />
           <Route path="apps/create" element={<CreateApplicationPage />} />
           <Route path="apps/:appId" element={<DeveloperAppDetailsPage />} />
@@ -176,6 +200,7 @@ export const AppRoutes = () => {
           <Route path="analytics" element={<DeveloperAnalyticsPage />} />
           <Route path="profile" element={<DeveloperProfileSettingsPage />} />
           <Route path="settings" element={<DeveloperSettingsPage />} />
+          <Route path="referrals" element={<DeveloperReferralPage />} />
         </Route>
 
         {/* 3. Protected Admin Control Center Routes (Phase 7 & 9) */}
@@ -219,6 +244,10 @@ export const AppRoutes = () => {
           <Route path="analytics" element={<AdminAnalyticsPage />} />
           <Route path="notifications" element={<AdminNotificationsPage />} />
           <Route path="audit-logs" element={<AdminAuditLogsPage />} />
+          <Route path="activity-logs" element={<AdminAuditLogsPage />} />
+          <Route path="system-health" element={<AdminSystemHealthPage />} />
+          <Route path="beta" element={<AdminBetaDashboardPage />} />
+          <Route path="growth" element={<AdminGrowthDashboardPage />} />
           <Route path="settings" element={<AdminSettingsPage />} />
           <Route path="search" element={<AdminSearchPage />} />
         </Route>

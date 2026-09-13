@@ -100,10 +100,25 @@ export const DeveloperProfileSettingsPage = () => {
       console.error('Failed to update developer profile:', err);
       setFeedback({
         type: 'error',
-        message: err.message || 'Failed to update developer profile.',
+        message: err.response?.data?.message || 'Failed to update developer profile.',
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2 * 1024 * 1024) {
+        setFeedback({ type: 'error', message: 'Image size must be less than 2MB.' });
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, profileImage: reader.result });
+      };
+      reader.readAsDataURL(file);
     }
   };
 
@@ -207,13 +222,27 @@ export const DeveloperProfileSettingsPage = () => {
                   <User className="w-5 h-5 text-content-dim" />
                 )}
               </div>
-              <input
-                type="url"
-                value={formData.profileImage}
-                onChange={(e) => setFormData({ ...formData, profileImage: e.target.value })}
-                placeholder="https://example.com/avatar.png"
-                className="flex-1 px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
-              />
+              <div className="flex-1 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <input
+                  type="url"
+                  value={formData.profileImage}
+                  onChange={(e) => setFormData({ ...formData, profileImage: e.target.value })}
+                  placeholder="https://example.com/avatar.png"
+                  className="flex-1 w-full px-3.5 py-2.5 rounded-xl bg-surface-elevated border border-white/10 text-xs text-content-primary focus:outline-none focus:border-primary"
+                />
+                <div className="relative flex-shrink-0 w-full sm:w-auto">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFileChange}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    title="Select from local device"
+                  />
+                  <div className="px-4 py-2.5 rounded-xl bg-surface border border-white/10 text-xs font-semibold text-content-primary hover:bg-white/5 transition-colors text-center pointer-events-none">
+                    Select from Device
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
 

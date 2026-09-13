@@ -34,8 +34,8 @@ export const AdminDashboardPage = () => {
         adminApi.getDashboardStats(),
         adminApi.getDashboardAnalytics(range),
       ]);
-      setStats(statsRes.data?.data || null);
-      setAnalytics(analyticsRes.data?.data || null);
+      setStats(statsRes.data || null);
+      setAnalytics(analyticsRes.data || null);
     } catch (err) {
       console.error('Failed to load admin dashboard:', err);
     } finally {
@@ -48,13 +48,13 @@ export const AdminDashboardPage = () => {
   }, [range]);
 
   const userChartData = (analytics?.userGrowth || []).map((item) => ({
-    label: item._id.split('-').slice(1).join('/'),
-    value: item.users,
+    label: (item.label || '').split('-').slice(1).join('/'),
+    value: item.value || 0,
   }));
 
   const appChartData = (analytics?.appSubmissions || []).map((item) => ({
-    label: item._id.split('-').slice(1).join('/'),
-    value: item.apps,
+    label: (item._id || '').split('-').slice(1).join('/'),
+    value: item.apps || 0,
   }));
 
   return (

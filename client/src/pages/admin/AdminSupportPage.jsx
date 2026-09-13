@@ -32,9 +32,9 @@ const AdminSupportPage = () => {
         category: filters.category !== 'ALL' ? filters.category : undefined
       };
       const res = await adminApi.getSupportTickets(params);
-      if (res.data?.success) {
-        setTickets(res.data.data.tickets || []);
-        setPagination(res.data.data.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
+      if (res.success) {
+        setTickets(res.data.tickets || []);
+        setPagination(res.data.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
       }
     } catch (err) {
       console.error('Failed to load support tickets:', err);

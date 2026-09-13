@@ -12,6 +12,10 @@ import {
   sanitizeUser,
 } from '../utils/tokenUtils.js';
 import emailService from '../services/emailService.js';
+import { OAuth2Client } from 'google-auth-library';
+import { admin } from '../config/firebaseAdmin.js';
+
+const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 
 /**
  * @desc    Register a new User or Developer
@@ -102,9 +106,41 @@ export const login = asyncHandler(async (req, res, next) => {
   // 1. Find user by email and explicitly select password
   const user = await User.findOne({ email: email.toLowerCase() }).select('+password');
 
-  if (!user || !(await user.comparePassword(password))) {
+  if (!user) {
     return next(new AppError('Invalid email or password.', 401));
   }
+
+  // Sprint 11: Brute-Force Account Protection Check
+  if (user.isLocked()) {
+    const remainingMinutes = Math.ceil((user.lockUntil.getTime() - Date.now()) / (60 * 1000));
+    return res.status(423).json({
+      success: false,
+      code: 'ACCOUNT_LOCKED',
+      message: `Account is temporarily locked due to consecutive failed login attempts. Please try again in ${remainingMinutes} minute${remainingMinutes === 1 ? '' : 's'}.`,
+    });
+  }
+
+  const isMatch = await user.comparePassword(password);
+  if (!isMatch) {
+    await user.incrementLoginAttempts();
+    if (user.isLocked()) {
+      return res.status(423).json({
+        success: false,
+        code: 'ACCOUNT_LOCKED',
+        message: 'Account has been temporarily locked for 15 minutes due to 5 consecutive failed login attempts.',
+      });
+    }
+    const remainingAttempts = Math.max(0, 5 - (user.failedLoginAttempts || 0));
+    return next(
+      new AppError(
+        `Invalid email or password. ${remainingAttempts} attempt${remainingAttempts === 1 ? '' : 's'} remaining before temporary account lock.`,
+        401
+      )
+    );
+  }
+
+  // Reset failed login count upon successful password match
+  await user.resetLoginAttempts();
 
   // 2. Check account status
   if (user.accountStatus === 'SUSPENDED') {
@@ -168,6 +204,232 @@ export const login = asyncHandler(async (req, res, next) => {
     },
   });
 });
+
+/**
+ * @desc    Login or register via Google OAuth
+ * @route   POST /api/auth/google
+ * @access  Public
+ */
+export const googleLogin = asyncHandler(async (req, res, next) => {
+  const { credential, role } = req.body;
+
+  if (!credential) {
+    return next(new AppError('Google authentication credential is required', 400));
+  }
+
+  // Verify Google token
+  const ticket = await client.verifyIdToken({
+    idToken: credential,
+    audience: process.env.GOOGLE_CLIENT_ID,
+  });
+  const payload = ticket.getPayload();
+  const { email, sub: googleId, name, email_verified } = payload;
+
+  if (!email_verified) {
+    return next(new AppError('Your Google email address is not verified.', 403));
+  }
+
+  let user = await User.findOne({ email: email.toLowerCase() });
+
+  if (user) {
+    if (user.accountStatus === 'BANNED') {
+      return next(new AppError('Your account has been permanently banned.', 403));
+    }
+    // Link google account if not already
+    if (!user.googleId) {
+      user.googleId = googleId;
+      user.authProvider = 'GOOGLE';
+      await user.save({ validateBeforeSave: false });
+    }
+  } else {
+    // Register new user
+    const normalizedRole = role ? role.toUpperCase() : 'USER';
+    if (!['USER', 'DEVELOPER'].includes(normalizedRole)) {
+      return next(new AppError('Role must be either USER or DEVELOPER.', 400));
+    }
+
+    user = new User({
+      name,
+      email: email.toLowerCase(),
+      role: normalizedRole,
+      accountStatus: 'ACTIVE',
+      emailVerified: true,
+      authProvider: 'GOOGLE',
+      googleId,
+    });
+    await user.save({ validateBeforeSave: false }); // password is not required for Google
+
+    if (normalizedRole === 'DEVELOPER') {
+      try {
+        await DeveloperProfile.create({ userId: user._id, verificationStatus: 'PENDING' });
+      } catch (err) {
+        // Log error but don't fail auth
+        console.error('Failed to create DeveloperProfile:', err);
+      }
+    }
+  }
+
+  const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user);
+  const tokenHash = hashToken(refreshToken);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+  user.refreshTokens = user.refreshTokens.filter((t) => t.expiresAt > new Date());
+  user.refreshTokens.push({
+    tokenHash,
+    expiresAt,
+    userAgent: req.headers['user-agent'] || '',
+    ip: req.ip || '',
+  });
+
+  user.lastLogin = new Date();
+  await user.save({ validateBeforeSave: false });
+
+  setRefreshTokenCookie(res, refreshToken);
+
+  res.status(200).json({
+    success: true,
+    message: 'Google login successful.',
+    data: {
+      accessToken,
+      user: sanitizeUser(user),
+    },
+  });
+});
+
+/**
+ * @desc    Complete profile after Firebase Auth registration
+ * @route   POST /api/auth/firebase-signup
+ * @access  Public
+ */
+export const firebaseSignup = asyncHandler(async (req, res, next) => {
+  const { idToken, name, role } = req.body;
+
+  if (!idToken) return next(new AppError('Firebase ID token is required', 400));
+  if (!name) return next(new AppError('Name is required to complete profile', 400));
+
+  const decodedToken = await admin.auth().verifyIdToken(idToken);
+  const { email, sub: googleId, email_verified } = decodedToken;
+
+  if (!email_verified) {
+    return next(new AppError('Your email address is not verified by Firebase.', 403));
+  }
+
+  if (!email.toLowerCase().endsWith('@gmail.com')) {
+    return next(new AppError('Only valid @gmail.com accounts are permitted.', 403));
+  }
+
+  let user = await User.findOne({ email: email.toLowerCase() });
+  if (user) {
+    return next(new AppError('An account with this email already exists.', 400));
+  }
+
+  const normalizedRole = role ? role.toUpperCase() : 'USER';
+  if (!['USER', 'DEVELOPER'].includes(normalizedRole)) {
+    return next(new AppError('Role must be either USER or DEVELOPER.', 400));
+  }
+
+  user = new User({
+    name,
+    email: email.toLowerCase(),
+    role: normalizedRole,
+    accountStatus: 'ACTIVE',
+    emailVerified: true,
+    authProvider: 'GOOGLE', // Marking as Google since we enforced gmail
+    googleId,
+  });
+  await user.save({ validateBeforeSave: false });
+
+  if (normalizedRole === 'DEVELOPER') {
+    try {
+      await DeveloperProfile.create({ userId: user._id, verificationStatus: 'PENDING' });
+    } catch (err) {
+      console.error('Failed to create DeveloperProfile:', err);
+    }
+  }
+
+  const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user);
+  const tokenHash = hashToken(refreshToken);
+  
+  user.refreshTokens = [{
+    tokenHash,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    userAgent: req.headers['user-agent'] || '',
+    ip: req.ip || '',
+  }];
+  user.lastLogin = new Date();
+  await user.save({ validateBeforeSave: false });
+
+  setRefreshTokenCookie(res, refreshToken);
+
+  res.status(201).json({
+    success: true,
+    message: 'Profile completed successfully.',
+    data: {
+      accessToken,
+      user: sanitizeUser(user),
+    },
+  });
+});
+
+/**
+ * @desc    Login via Firebase Auth token
+ * @route   POST /api/auth/firebase-login
+ * @access  Public
+ */
+export const firebaseLogin = asyncHandler(async (req, res, next) => {
+  const { idToken } = req.body;
+  if (!idToken) return next(new AppError('Firebase ID token is required', 400));
+
+  const decodedToken = await admin.auth().verifyIdToken(idToken);
+  const { email, email_verified } = decodedToken;
+
+  if (!email_verified) {
+    return next(new AppError('Your email address is not verified by Firebase.', 403));
+  }
+
+  const user = await User.findOne({ email: email.toLowerCase() });
+  
+  if (!user) {
+    // Return a specific 404 code so the frontend knows to redirect to /complete-profile
+    return res.status(404).json({
+      success: false,
+      code: 'PROFILE_NOT_FOUND',
+      message: 'Your AppOrbit profile is incomplete.',
+    });
+  }
+
+  if (user.accountStatus === 'BANNED') {
+    return next(new AppError('Your account has been permanently banned.', 403));
+  }
+
+  const accessToken = generateAccessToken(user);
+  const refreshToken = generateRefreshToken(user);
+  const tokenHash = hashToken(refreshToken);
+  
+  user.refreshTokens = user.refreshTokens.filter((t) => t.expiresAt > new Date());
+  user.refreshTokens.push({
+    tokenHash,
+    expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+    userAgent: req.headers['user-agent'] || '',
+    ip: req.ip || '',
+  });
+  user.lastLogin = new Date();
+  await user.save({ validateBeforeSave: false });
+
+  setRefreshTokenCookie(res, refreshToken);
+
+  res.status(200).json({
+    success: true,
+    message: 'Login successful.',
+    data: {
+      accessToken,
+      user: sanitizeUser(user),
+    },
+  });
+});
+
 
 /**
  * @desc    Revoke refresh token and clear cookie
@@ -470,6 +732,51 @@ export const updateProfile = asyncHandler(async (req, res, next) => {
   });
 });
 
+
+/**
+ * @desc    Upgrade User to Developer with a 1-Time Free Trial
+ * @route   POST /api/auth/upgrade-trial
+ * @access  Private (User only)
+ */
+export const upgradeToTrial = asyncHandler(async (req, res, next) => {
+  const user = await User.findById(req.user._id);
+
+  if (!user) {
+    return next(new AppError('User not found', 404));
+  }
+
+  if (user.role === 'DEVELOPER') {
+    return next(new AppError('You are already a developer.', 400));
+  }
+
+  if (user.freeTrialUsed) {
+    return next(new AppError('You have already used your free trial. Please purchase a subscription.', 403));
+  }
+
+  // Upgrade role and mark trial as used
+  user.role = 'DEVELOPER';
+  user.freeTrialUsed = true;
+  await user.save();
+
+  // Create Developer Profile
+  const existingProfile = await DeveloperProfile.findOne({ userId: user._id });
+  if (!existingProfile) {
+    await DeveloperProfile.create({
+      userId: user._id,
+      companyName: user.name || 'Developer',
+      website: '',
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    message: 'Successfully upgraded to Developer! Welcome to your Free Trial.',
+    data: {
+      user: sanitizeUser(user),
+    },
+  });
+});
+
 export default {
   signup,
   login,
@@ -481,4 +788,7 @@ export default {
   resendVerification,
   getMe,
   updateProfile,
+  firebaseLogin,
+  firebaseSignup,
+  upgradeToTrial,
 };

@@ -1,6 +1,7 @@
 import { AppError } from '../utils/AppError.js';
 import logger from '../utils/logger.js';
 import sentry from '../utils/sentry.js';
+import MonitoringService from '../services/monitoringService.js';
 
 /**
  * Standard Error Code Mapping based on HTTP status.
@@ -141,6 +142,14 @@ export const errorHandler = (err, req, res, _next) => {
   if (error.name === 'CastError') error = handleCastErrorDB(error);
   if (error.code === 11000) error = handleDuplicateFieldsDB(error);
   if (error.name === 'ValidationError') error = handleValidationErrorDB(error);
+
+  // Capture into Sprint 10 Centralized Error Monitoring
+  MonitoringService.captureError(error, {
+    path: req.originalUrl,
+    method: req.method,
+    statusCode: error.statusCode,
+    userId: req.user?._id,
+  });
 
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(error, req, res);

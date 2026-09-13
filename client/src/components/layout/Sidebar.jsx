@@ -21,6 +21,10 @@ import {
   Flag,
   History,
   MessageSquare,
+  Activity,
+  Rocket,
+  TrendingUp,
+  Gift,
 } from 'lucide-react';
 
 /**
@@ -34,6 +38,7 @@ export const Sidebar = ({ portalType = 'developer', isOpen, onClose }) => {
   const developerLinks = [
     { label: 'Dashboard', path: '/developer', icon: <LayoutDashboard className="w-4 h-4" /> },
     { label: 'My Applications', path: '/developer/apps', icon: <Boxes className="w-4 h-4" /> },
+    { label: 'User Messages', path: '/developer/messages', icon: <MessageSquare className="w-4 h-4 text-accent-cyan" /> },
     { label: 'Community Reviews', path: '/developer/reviews', icon: <MessageSquare className="w-4 h-4 text-purple-400" /> },
     { label: 'Create Application', path: '/developer/apps/create', icon: <PlusCircle className="w-4 h-4 text-accent-cyan" /> },
     { label: 'Upgrade Plans', path: '/developer/pricing', icon: <Crown className="w-4 h-4 text-amber-400" /> },
@@ -42,11 +47,14 @@ export const Sidebar = ({ portalType = 'developer', isOpen, onClose }) => {
     { label: 'Analytics', path: '/developer/analytics', icon: <BarChart3 className="w-4 h-4" /> },
     { label: 'Developer Profile', path: '/developer/profile', icon: <User className="w-4 h-4" /> },
     { label: 'Notification Alerts', path: '/developer/settings/notifications', icon: <Bell className="w-4 h-4 text-indigo-400" /> },
+    { label: 'Invite & Earn', path: '/developer/referrals', icon: <Gift className="w-4 h-4 text-fuchsia-400" /> },
     { label: 'Settings', path: '/developer/settings', icon: <Settings className="w-4 h-4" /> },
   ];
 
   const adminLinks = [
     { label: 'Dashboard', path: '/admin', icon: <LayoutDashboard className="w-4 h-4" /> },
+    { label: 'Beta Operations', path: '/admin/beta', icon: <Rocket className="w-4 h-4 text-fuchsia-400" /> },
+    { label: 'Growth Center', path: '/admin/growth', icon: <TrendingUp className="w-4 h-4 text-emerald-400" /> },
     { label: 'Applications', path: '/admin/apps', icon: <Boxes className="w-4 h-4" /> },
     { label: 'Security Reviews', path: '/admin/security', icon: <ShieldAlert className="w-4 h-4 text-amber-400" /> },
     { label: 'Developers', path: '/admin/developers', icon: <Users className="w-4 h-4" /> },
@@ -57,6 +65,7 @@ export const Sidebar = ({ portalType = 'developer', isOpen, onClose }) => {
     { label: 'Review Moderation', path: '/admin/reviews', icon: <MessageSquare className="w-4 h-4 text-purple-400" /> },
     { label: 'Reports', path: '/admin/reports', icon: <Flag className="w-4 h-4 text-rose-400" /> },
     { label: 'Platform Analytics', path: '/admin/analytics', icon: <BarChart3 className="w-4 h-4" /> },
+    { label: 'System Health', path: '/admin/system-health', icon: <Activity className="w-4 h-4 text-emerald-400" /> },
     { label: 'Notifications', path: '/admin/notifications', icon: <Bell className="w-4 h-4" /> },
     { label: 'Audit Logs', path: '/admin/audit-logs', icon: <History className="w-4 h-4" /> },
     { label: 'System Settings', path: '/admin/settings', icon: <Settings className="w-4 h-4" /> },
@@ -92,9 +101,7 @@ export const Sidebar = ({ portalType = 'developer', isOpen, onClose }) => {
           {/* Logo & Portal Branding */}
           <div className="h-16 px-4 flex items-center justify-between border-b border-white/10 bg-surface/50">
             <Link to="/" className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-surface border border-white/10 flex items-center justify-center p-1">
-                <img src="/logo.svg" alt="AppOrbit" className="w-full h-full object-contain" />
-              </div>
+              <img src="/logo.png" alt="AppOrbit" className="w-8 h-8 rounded-lg object-cover shrink-0" />
               <div className="flex flex-col">
                 <span className="font-heading font-extrabold text-sm text-content-primary leading-tight">
                   AppOrbit

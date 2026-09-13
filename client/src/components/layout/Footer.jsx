@@ -13,7 +13,7 @@ export const Footer = () => {
           <div className="lg:col-span-2 flex flex-col gap-4">
             <Link to="/" className="flex items-center gap-3">
               <div className="w-9 h-9 rounded-xl bg-surface border border-white/10 flex items-center justify-center p-1.5 shadow-sm">
-                <img src="/logo.svg" alt="AppOrbit" className="w-full h-full object-contain" />
+                <img src="/logo.png" alt="AppOrbit" className="w-full h-full object-cover" />
               </div>
               <span className="font-heading font-extrabold text-lg text-content-primary tracking-tight">
                 App<span className="text-primary">Orbit</span>
@@ -108,6 +108,16 @@ export const Footer = () => {
               <li>
                 <Link to="/about" className="hover:text-white transition-colors">
                   About AppOrbit
+                </Link>
+              </li>
+              <li>
+                <Link to="/beta" className="hover:text-white transition-colors text-primary font-semibold">
+                  Public Beta Program
+                </Link>
+              </li>
+              <li>
+                <Link to="/press" className="hover:text-white transition-colors">
+                  Press & Brand Kit
                 </Link>
               </li>
               <li>

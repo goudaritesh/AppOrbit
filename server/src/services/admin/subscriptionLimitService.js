@@ -26,13 +26,17 @@ export class SubscriptionLimitService {
         freePlan = await SubscriptionPlan.create(DEFAULT_PLANS[0]);
       }
 
+      const resetDate = new Date();
+      resetDate.setFullYear(resetDate.getFullYear() + 1);
+
       sub = await Subscription.create({
         developer: developerId,
         plan: freePlan._id,
         planSlug: freePlan.slug,
         status: 'ACTIVE',
-        appsLimit: freePlan.appLimit,
+        publishingCredits: { total: freePlan.publishingCredits, used: 0 },
         startDate: new Date(),
+        usageResetDate: resetDate,
       });
       sub.plan = freePlan;
     }
@@ -49,10 +53,10 @@ export class SubscriptionLimitService {
     const sub = await this.getOrCreateActiveSubscription(developerId);
     const plan = sub.plan || (await SubscriptionPlan.findById(sub.plan));
 
-    const limit = sub.appsLimit !== undefined ? sub.appsLimit : (plan?.appLimit ?? 1);
+    const limit = sub.publishingCredits?.total ?? (plan?.publishingCredits ?? 1);
 
-    // Count published/approved applications or sub.applicationsUsed
-    let used = sub.applicationsUsed || 0;
+    // Count published/approved applications or sub.publishingCredits.used
+    let used = sub.publishingCredits?.used || 0;
     if (sub.planSlug === 'free') {
       const publishedCount = await App.countDocuments({
         developer: developerId,
@@ -81,7 +85,7 @@ export class SubscriptionLimitService {
       resetDate: sub.usageResetDate || sub.endDate,
       reason: allowed
         ? undefined
-        : 'Your monthly app publishing limit has been reached.',
+        : 'Your annual app publishing limit has been reached.',
     };
   }
 

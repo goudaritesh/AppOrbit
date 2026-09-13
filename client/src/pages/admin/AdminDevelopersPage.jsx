@@ -30,8 +30,8 @@ export const AdminDevelopersPage = () => {
         search: search.trim() || undefined,
       };
       const res = await adminApi.getDevelopers(params);
-      setDevelopers(res.data?.data?.developers || []);
-      setPagination(res.data?.data?.pagination || { page: 1, pages: 1, total: 0 });
+      setDevelopers(res.data?.developers || []);
+      setPagination(res.data?.pagination || { page: 1, pages: 1, total: 0 });
     } catch (err) {
       console.error('Failed to load developers:', err);
     } finally {

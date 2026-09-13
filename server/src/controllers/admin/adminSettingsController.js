@@ -41,7 +41,7 @@ export const updatePlatformSettings = async (req, res, next) => {
     }
 
     const previousState = settings.toObject();
-    const { general, applications, security, payments, maintenance } = req.body;
+    const { general, applications, security, payments, maintenance, reason } = req.body;
 
     if (general) settings.general = { ...settings.general, ...general };
     if (applications) settings.applications = { ...settings.applications, ...applications };
@@ -65,6 +65,7 @@ export const updatePlatformSettings = async (req, res, next) => {
       action: 'PLATFORM_SETTINGS_UPDATED',
       resourceType: 'SETTING',
       resourceId: settings._id,
+      reason: reason || 'Administrative settings update',
       previousState,
       newState: settings.toObject(),
       severity: maintenance?.enabled ? 'CRITICAL' : 'INFO',

@@ -1,48 +1,20 @@
-import crypto from 'crypto';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Root storage directories
-const STORAGE_ROOT = path.resolve(__dirname, '../../../server/storage/private');
-const QUARANTINE_ROOT = path.join(STORAGE_ROOT, 'quarantine');
-const APPROVED_ROOT = path.join(STORAGE_ROOT, 'approved');
-const REJECTED_ROOT = path.join(STORAGE_ROOT, 'rejected');
+import { storageService } from '../services/storage/storageService.js';
 
 export class ApkSecurityPipeline {
-  static _ensureDirectories() {
-    [QUARANTINE_ROOT, APPROVED_ROOT, REJECTED_ROOT].forEach((dir) => {
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-    });
-  }
-
   /**
    * Moves an uploaded APK into quarantine storage upon arrival
    */
-  static async moveToQuarantine(appId, versionId, sourcePath) {
-    this._ensureDirectories();
-    const appDir = path.join(QUARANTINE_ROOT, appId.toString());
-    if (!fs.existsSync(appDir)) {
-      fs.mkdirSync(appDir, { recursive: true });
+  static async moveToQuarantine(appId, versionId, currentKey) {
+    if (!currentKey) {
+      throw new Error('Current storage key is required to move to quarantine');
     }
 
-    const targetKey = `quarantine/${appId}/${versionId}.apk`;
-    const targetPath = path.join(appDir, `${versionId}.apk`);
-
-    if (sourcePath && fs.existsSync(sourcePath)) {
-      await fs.promises.copyFile(sourcePath, targetPath);
-      // Delete original to prevent accidental public download
-      await fs.promises.unlink(sourcePath);
-    }
+    const newKey = storageService.generateStorageKey(null, appId, versionId, currentKey, 'quarantine');
+    const result = await storageService.moveApk({ oldKey: currentKey, newKey });
 
     return {
-      storageKey: targetKey,
-      storagePath: targetPath,
+      storageKey: result.key,
+      storagePath: result.storagePath,
       quarantined: true,
       quarantinedAt: new Date(),
     };
@@ -51,24 +23,17 @@ export class ApkSecurityPipeline {
   /**
    * Promotes an approved APK out of quarantine into approved private storage
    */
-  static async promoteToApproved(appId, versionId, quarantinePath) {
-    this._ensureDirectories();
-    const appDir = path.join(APPROVED_ROOT, appId.toString());
-    if (!fs.existsSync(appDir)) {
-      fs.mkdirSync(appDir, { recursive: true });
+  static async promoteToApproved(appId, versionId, currentKey) {
+    if (!currentKey) {
+      throw new Error('Current storage key is required to promote to approved');
     }
 
-    const approvedKey = `approved/${appId}/version-${versionId}.apk`;
-    const targetPath = path.join(appDir, `version-${versionId}.apk`);
-
-    if (quarantinePath && fs.existsSync(quarantinePath)) {
-      await fs.promises.copyFile(quarantinePath, targetPath);
-      await fs.promises.unlink(quarantinePath);
-    }
+    const newKey = storageService.generateStorageKey(null, appId, versionId, currentKey, 'verified');
+    const result = await storageService.moveApk({ oldKey: currentKey, newKey });
 
     return {
-      storageKey: approvedKey,
-      storagePath: targetPath,
+      storageKey: result.key,
+      storagePath: result.storagePath,
       quarantined: false,
     };
   }
@@ -76,30 +41,131 @@ export class ApkSecurityPipeline {
   /**
    * Moves a rejected or malicious APK to isolated rejected storage
    */
-  static async moveToRejected(appId, versionId, currentPath) {
-    this._ensureDirectories();
-    const appDir = path.join(REJECTED_ROOT, appId.toString());
-    if (!fs.existsSync(appDir)) {
-      fs.mkdirSync(appDir, { recursive: true });
+  static async moveToRejected(appId, versionId, currentKey) {
+    if (!currentKey) {
+      throw new Error('Current storage key is required to move to rejected');
     }
 
-    const rejectedKey = `rejected/${appId}/${versionId}.apk`;
-    const targetPath = path.join(appDir, `${versionId}.apk`);
-
-    if (currentPath && fs.existsSync(currentPath)) {
-      await fs.promises.copyFile(currentPath, targetPath);
-      await fs.promises.unlink(currentPath);
-    }
+    const newKey = storageService.generateStorageKey(null, appId, versionId, currentKey, 'rejected');
+    const result = await storageService.moveApk({ oldKey: currentKey, newKey });
 
     return {
-      storageKey: rejectedKey,
-      storagePath: targetPath,
+      storageKey: result.key,
+      storagePath: result.storagePath,
       quarantined: true,
     };
   }
 
   /**
-   * Static & Heuristic Security Scan
+   * Validates raw APK binary integrity, extension, size, and ZIP structure (Sprint 11)
+   */
+  static validateApkBinary({ buffer, fileName = '', fileSize = 0 }) {
+    if (!fileName.toLowerCase().endsWith('.apk')) {
+      return { isValid: false, error: 'Invalid file extension. Only .apk files are supported.' };
+    }
+
+    const size = fileSize || (buffer ? buffer.length : 0);
+    const MAX_BYTES = 200 * 1024 * 1024; // 200MB
+    if (size <= 0 || size > MAX_BYTES) {
+      return { isValid: false, error: `File size (${size} bytes) exceeds maximum limit of 200MB.` };
+    }
+
+    if (!buffer || buffer.length < 4) {
+      return { isValid: false, error: 'Corrupt or empty binary payload.' };
+    }
+
+    // ZIP magic bytes check: PK\x03\x04 (0x50 0x4B 0x03 0x04)
+    const isZip =
+      buffer[0] === 0x50 &&
+      buffer[1] === 0x4b &&
+      buffer[2] === 0x03 &&
+      buffer[3] === 0x04;
+
+    if (!isZip) {
+      return { isValid: false, error: 'Corrupted APK file: Invalid binary magic header (expected ZIP header).' };
+    }
+
+    return { isValid: true, fileSize: size };
+  }
+
+  /**
+   * Computes deterministic SHA-256 integrity checksum for untrusted binary
+   */
+  static computeApkChecksum(buffer) {
+    if (!buffer) return null;
+    return crypto.createHash('sha256').update(buffer).digest('hex').toLowerCase();
+  }
+
+  /**
+   * Android Permission Risk Analysis (Sprint 11 Priority 2)
+   * Evaluates requested permissions against known privilege threat vectors.
+   */
+  static analyzePermissions(permissions = []) {
+    const HIGH_RISK_SET = new Set([
+      'android.permission.RECORD_AUDIO',
+      'android.permission.CAMERA',
+      'android.permission.READ_CONTACTS',
+      'android.permission.WRITE_CONTACTS',
+      'android.permission.SEND_SMS',
+      'android.permission.RECEIVE_SMS',
+      'android.permission.READ_SMS',
+      'android.permission.ACCESS_FINE_LOCATION',
+      'android.permission.READ_PHONE_STATE',
+      'android.permission.CALL_PHONE',
+      'android.permission.SYSTEM_ALERT_WINDOW',
+    ]);
+
+    const MEDIUM_RISK_SET = new Set([
+      'android.permission.READ_EXTERNAL_STORAGE',
+      'android.permission.WRITE_EXTERNAL_STORAGE',
+      'android.permission.ACCESS_COARSE_LOCATION',
+      'android.permission.BLUETOOTH',
+      'android.permission.BLUETOOTH_ADMIN',
+      'android.permission.CHANGE_WIFI_STATE',
+    ]);
+
+    const categorized = {
+      high: [],
+      medium: [],
+      low: [],
+    };
+
+    let baseRiskScore = 0;
+
+    for (const perm of permissions) {
+      const normalized = perm.trim();
+      if (HIGH_RISK_SET.has(normalized)) {
+        categorized.high.push(normalized);
+        baseRiskScore += 18;
+      } else if (MEDIUM_RISK_SET.has(normalized)) {
+        categorized.medium.push(normalized);
+        baseRiskScore += 8;
+      } else {
+        categorized.low.push(normalized);
+        baseRiskScore += 2;
+      }
+    }
+
+    const riskScore = Math.min(100, baseRiskScore);
+    let riskLevel = 'LOW';
+    if (riskScore >= 70 || categorized.high.length >= 3) {
+      riskLevel = 'HIGH';
+    } else if (riskScore >= 35 || categorized.high.length >= 1 || categorized.medium.length >= 2) {
+      riskLevel = 'MEDIUM';
+    }
+
+    return {
+      permissionRisks: categorized,
+      riskScore,
+      riskLevel,
+      highRiskCount: categorized.high.length,
+      mediumRiskCount: categorized.medium.length,
+      lowRiskCount: categorized.low.length,
+    };
+  }
+
+  /**
+   * Static & Heuristic Security Scan (Sprint 11 Malware Engine)
    */
   static scanApkBuffer(buffer) {
     if (!buffer || buffer.length === 0) {
@@ -108,28 +174,54 @@ export class ApkSecurityPipeline {
         scanResult: 'error',
         threatsDetected: 0,
         findings: ['Empty binary buffer'],
+        sha256: null,
+      };
+    }
+
+    const sha256 = this.computeApkChecksum(buffer);
+
+    // Mock Scanner for Development environments only
+    if (process.env.NODE_ENV !== 'production') {
+      console.warn('[ApkSecurityPipeline] Using DEV MOCK scanner. Do NOT use in production.');
+      return {
+        scanStatus: 'SCAN_PASSED',
+        scanResult: 'clean',
+        threatsDetected: 0,
+        scanner: 'Mock Scanner (Dev Only)',
+        sha256,
+        scannedAt: new Date(),
+        findings: ['Mock scan passed successfully'],
       };
     }
 
     const contentStr = buffer.toString('binary');
     const threats = [];
 
-    // Check for obvious malicious indicators
+    // Check for known malware heuristics / payload signatures
     if (contentStr.includes('trojan.dropper') || contentStr.includes('malware.payload')) {
-      threats.push('Known malware signature detected');
+      threats.push('Known malicious trojan dropper signature detected');
+    }
+    if (contentStr.includes('exploit.privilege.root') || contentStr.includes('cve-payload')) {
+      threats.push('Privilege escalation exploit pattern identified');
     }
 
     const threatsDetected = threats.length;
-    const scanStatus = threatsDetected > 0 ? 'SCAN_FAILED' : 'SCAN_PASSED';
-    const scanResult = threatsDetected > 0 ? 'malicious' : 'clean';
+    let scanStatus = 'SCAN_PASSED';
+    let scanResult = 'clean';
+
+    if (threatsDetected > 0) {
+      scanStatus = 'SCAN_FAILED';
+      scanResult = 'malicious';
+    }
 
     return {
       scanStatus,
       scanResult,
       threatsDetected,
-      scanner: 'AppOrbit Heuristic & Static Scanner v2',
+      scanner: 'AppOrbit Heuristic & Static Scanner v2.5 (Sprint 11)',
+      sha256,
       scannedAt: new Date(),
-      findings: threats.length > 0 ? threats : ['No threats detected during configured security scans'],
+      findings: threats.length > 0 ? threats : ['No malicious patterns detected during static analysis'],
     };
   }
 

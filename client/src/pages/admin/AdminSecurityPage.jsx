@@ -25,8 +25,8 @@ export const AdminSecurityPage = () => {
         riskLevel: filterRisk !== 'ALL' ? filterRisk : undefined,
       };
       const res = await adminApi.getSecurityReports(params);
-      setReports(res.data?.data?.reports || []);
-      setPagination(res.data?.data?.pagination || { page: 1, pages: 1, total: 0 });
+      setReports(res.data?.reports || []);
+      setPagination(res.data?.pagination || { page: 1, pages: 1, total: 0 });
     } catch (err) {
       console.error('Failed to load security reports:', err);
     } finally {

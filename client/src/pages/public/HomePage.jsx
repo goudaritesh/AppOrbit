@@ -71,11 +71,11 @@ export const HomePage = () => {
 
   // Skeleton Card Loader
   const renderSkeletons = (count = 6) => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+    <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 scrollbar-hide">
       {Array.from({ length: count }).map((_, i) => (
         <div
           key={i}
-          className="rounded-2xl bg-surface border border-white/5 p-5 animate-pulse flex flex-col gap-4"
+          className="min-w-[300px] w-[300px] sm:min-w-[350px] sm:w-[350px] shrink-0 snap-start rounded-2xl bg-surface border border-white/5 p-5 animate-pulse flex flex-col gap-4"
         >
           <div className="flex items-center gap-3.5">
             <div className="w-14 h-14 rounded-xl bg-white/5" />
@@ -133,7 +133,7 @@ export const HomePage = () => {
                 Explore Apps
               </Button>
             </Link>
-            <Link to="/developer" className="w-full sm:w-auto">
+            <Link to="/pricing" className="w-full sm:w-auto">
               <Button
                 variant="outline"
                 size="lg"
@@ -191,9 +191,11 @@ export const HomePage = () => {
         {loading ? (
           renderSkeletons(6)
         ) : featuredApps.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 scrollbar-hide">
             {featuredApps.map((app) => (
-              <AppCard key={app.id} app={app} featured />
+              <div key={app.id} className="min-w-[300px] w-[300px] sm:min-w-[350px] sm:w-[350px] shrink-0 snap-start">
+                <AppCard app={app} featured />
+              </div>
             ))}
           </div>
         ) : (
@@ -264,9 +266,11 @@ export const HomePage = () => {
         {loading ? (
           renderSkeletons(6)
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 scrollbar-hide">
             {popularApps.map((app) => (
-              <AppCard key={app.id} app={app} />
+              <div key={app.id} className="min-w-[300px] w-[300px] sm:min-w-[350px] sm:w-[350px] shrink-0 snap-start">
+                <AppCard app={app} />
+              </div>
             ))}
           </div>
         )}
@@ -295,9 +299,11 @@ export const HomePage = () => {
           {loading ? (
             renderSkeletons(6)
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div className="flex overflow-x-auto snap-x snap-mandatory gap-6 pb-6 scrollbar-hide">
               {recentApps.map((app) => (
-                <AppCard key={app.id} app={app} />
+                <div key={app.id} className="min-w-[300px] w-[300px] sm:min-w-[350px] sm:w-[350px] shrink-0 snap-start">
+                  <AppCard app={app} />
+                </div>
               ))}
             </div>
           )}

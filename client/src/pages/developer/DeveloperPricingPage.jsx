@@ -5,9 +5,11 @@ import { Crown, Sparkles, Shield, CreditCard, QrCode, CheckCircle2, Loader2, Ale
 import toast from 'react-hot-toast';
 import { subscriptionApi } from '../../api/subscriptionApi';
 import { paymentApi } from '../../api/paymentApi';
+import { authApi } from '../../api/authApi';
 import { setPlans, setCurrentSubscription, setUsage } from '../../store/slices/subscriptionSlice';
 import PricingCard from '../../components/subscription/PricingCard';
 import ManualPaymentModal from '../../components/payment/ManualPaymentModal';
+import Button from '../../components/ui/Button';
 
 /**
  * Dynamically injects Razorpay Checkout SDK into page
@@ -36,6 +38,7 @@ export const DeveloperPricingPage = () => {
   const [paymentMethodModal, setPaymentMethodModal] = useState(false);
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [verifyingPayment, setVerifyingPayment] = useState(false);
+  const [claimingTrial, setClaimingTrial] = useState(false);
 
   useEffect(() => {
     fetchPricingData();
@@ -44,20 +47,28 @@ export const DeveloperPricingPage = () => {
   const fetchPricingData = async () => {
     try {
       setLoading(true);
-      const [plansRes, subRes, usageRes] = await Promise.all([
-        subscriptionApi.getPlans(),
-        subscriptionApi.getCurrentSubscription(),
-        subscriptionApi.getUsage(),
-      ]);
-
+      
+      const plansRes = await subscriptionApi.getPlans();
       if (plansRes?.data?.plans) {
         dispatch(setPlans(plansRes.data.plans));
       }
-      if (subRes?.data?.subscription) {
-        dispatch(setCurrentSubscription(subRes.data.subscription));
-      }
-      if (usageRes?.data?.usage) {
-        dispatch(setUsage(usageRes.data.usage));
+
+      // Only fetch subscription and usage if the user is a developer
+      if (user?.role === 'DEVELOPER' || user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN') {
+        try {
+          const [subRes, usageRes] = await Promise.all([
+            subscriptionApi.getCurrentSubscription(),
+            subscriptionApi.getUsage(),
+          ]);
+          if (subRes?.data?.subscription) {
+            dispatch(setCurrentSubscription(subRes.data.subscription));
+          }
+          if (usageRes?.data?.usage) {
+            dispatch(setUsage(usageRes.data.usage));
+          }
+        } catch (subErr) {
+          console.error('Failed to load developer subscription details', subErr);
+        }
       }
     } catch (err) {
       toast.error('Failed to load subscription plans.');
@@ -155,6 +166,20 @@ export const DeveloperPricingPage = () => {
     setManualModalOpen(true);
   };
 
+  const handleClaimFreeTrial = async () => {
+    try {
+      setClaimingTrial(true);
+      await authApi.upgradeToTrial();
+      toast.success('Successfully upgraded to Developer! Welcome to your Free Trial.');
+      // Refresh page or auth state to reflect new role
+      window.location.href = '/developer';
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to claim free trial.');
+    } finally {
+      setClaimingTrial(false);
+    }
+  };
+
   const currentPlanSlug = usage?.planSlug || currentSubscription?.planSlug || 'free';
 
   return (
@@ -181,12 +206,36 @@ export const DeveloperPricingPage = () => {
           <span>Flexible Developer Tiers</span>
         </div>
         <h1 className="text-3xl sm:text-4xl font-heading font-extrabold text-content-primary tracking-tight">
-          Supercharge Your Android App Distribution
+          Fair & Flexible Developer Plans
         </h1>
         <p className="text-sm text-content-secondary leading-relaxed">
-          Scale from hobby builds to enterprise releases. Guaranteed malware scanning, priority reviews, and signed deployment pipelines.
+          Scale your Android apps with transparent limits. Leverage our free external hosting integrations, or upgrade for increased download and storage quotas.
         </p>
       </div>
+
+      {/* Free Trial Banner */}
+      {user?.role === 'USER' && !user?.freeTrialUsed && (
+        <div className="max-w-2xl mx-auto p-6 rounded-2xl bg-gradient-to-r from-accent-cyan/20 to-primary/20 border border-primary/30 flex flex-col sm:flex-row items-center justify-between gap-4 text-center sm:text-left">
+          <div>
+            <h3 className="text-xl font-bold text-content-primary flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-accent-cyan" />
+              Unlock Your 1-Time Free Trial
+            </h3>
+            <p className="text-sm text-content-secondary mt-1">
+              Become a developer instantly. Publish your first app and explore all developer features for free.
+            </p>
+          </div>
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={handleClaimFreeTrial}
+            disabled={claimingTrial}
+            className="whitespace-nowrap shadow-glow"
+          >
+            {claimingTrial ? 'Upgrading...' : 'Claim Free Trial'}
+          </Button>
+        </div>
+      )}
 
       {/* Pricing Cards Grid */}
       {loading ? (
@@ -225,7 +274,7 @@ export const DeveloperPricingPage = () => {
                 Upgrade to {selectedPlanForPayment.name} Plan
               </h3>
               <p className="text-xs text-content-dim mt-0.5">
-                Total: ₹{selectedPlanForPayment.price} / month
+                Total: ₹{selectedPlanForPayment.price}
               </p>
             </div>
 

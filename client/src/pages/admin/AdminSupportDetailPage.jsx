@@ -32,9 +32,9 @@ const AdminSupportDetailPage = () => {
     try {
       setLoading(true);
       const res = await adminApi.getSupportTicketById(ticketId);
-      if (res.data?.success) {
-        setTicket(res.data.data.ticket);
-        setMessages(res.data.data.messages || []);
+      if (res.success) {
+        setTicket(res.data.ticket);
+        setMessages(res.data.messages || []);
       }
     } catch (err) {
       console.error('Failed to load support ticket:', err);
@@ -61,8 +61,8 @@ const AdminSupportDetailPage = () => {
       const res = await adminApi.addTicketMessage(ticketId, {
         message: replyText.trim()
       });
-      if (res.data?.success) {
-        setMessages((prev) => [...prev, res.data.data.message]);
+      if (res.success) {
+        setMessages((prev) => [...prev, res.data.message]);
         setReplyText('');
         toast.success('Reply sent successfully');
         if (ticket.status === 'WAITING_FOR_USER' || ticket.status === 'OPEN') {
@@ -82,7 +82,7 @@ const AdminSupportDetailPage = () => {
     try {
       setUpdatingStatus(true);
       const res = await adminApi.updateTicketStatus(ticketId, { status: newStatus });
-      if (res.data?.success) {
+      if (res.success) {
         toast.success(`Ticket status updated to ${newStatus}`);
         setTicket((prev) => ({ ...prev, status: newStatus }));
       }
@@ -97,7 +97,7 @@ const AdminSupportDetailPage = () => {
   const handlePriorityChange = async (newPriority) => {
     try {
       const res = await adminApi.updateTicketStatus(ticketId, { priority: newPriority });
-      if (res.data?.success) {
+      if (res.success) {
         toast.success(`Ticket priority set to ${newPriority}`);
         setTicket((prev) => ({ ...prev, priority: newPriority }));
       }

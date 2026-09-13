@@ -41,9 +41,9 @@ const AdminReportsPage = () => {
         category: filters.category !== 'ALL' ? filters.category : undefined
       };
       const res = await adminApi.getReports(params);
-      if (res.data?.success) {
-        setReports(res.data.data.reports || []);
-        setPagination(res.data.data.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
+      if (res.success) {
+        setReports(res.data.reports || []);
+        setPagination(res.data.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
       }
     } catch (err) {
       console.error('Failed to load reports:', err);
@@ -66,7 +66,7 @@ const AdminReportsPage = () => {
         status: resolveModal.resolutionStatus,
         resolution: reason.trim()
       });
-      if (res.data?.success) {
+      if (res.success) {
         toast.success(`Report successfully marked as ${resolveModal.resolutionStatus}`);
         setResolveModal({ isOpen: false, report: null, resolutionStatus: 'RESOLVED' });
         fetchReports(pagination.page);

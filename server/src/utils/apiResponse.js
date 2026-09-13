@@ -46,4 +46,22 @@ export const sendError = (res, message = 'Something went wrong', statusCode = 50
 export default {
   sendSuccess,
   sendError,
+  success: (res, ...args) => {
+    // If called as success(res, statusCode, message, data)
+    if (typeof args[0] === 'number') {
+      const [statusCode, message, data] = args;
+      return sendSuccess(res, message, data, statusCode);
+    }
+    // If called as success(res, message, data, statusCode)
+    const [message, data, statusCode] = args;
+    return sendSuccess(res, message, data, statusCode || 200);
+  },
+  error: (res, ...args) => {
+    if (typeof args[0] === 'number') {
+      const [statusCode, message, errors] = args;
+      return sendError(res, message, statusCode, errors);
+    }
+    const [message, statusCode, errors] = args;
+    return sendError(res, message, statusCode || 500, errors);
+  },
 };

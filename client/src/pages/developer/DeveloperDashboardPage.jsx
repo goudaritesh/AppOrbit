@@ -19,6 +19,7 @@ import {
 import Card from '../../components/ui/Card';
 import Button from '../../components/ui/Button';
 import ApplicationStatusBadge from '../../components/developer/ApplicationStatusBadge';
+import DeveloperActivationWidget from '../../components/developer/DeveloperActivationWidget';
 import { getDeveloperAnalytics } from '../../api/developerPortalApi';
 import { formatNumber, formatDate } from '../../utils/formatters';
 
@@ -102,8 +103,39 @@ export const DeveloperDashboardPage = () => {
         </div>
       )}
 
+      {/* 1.5 Sprint 13 Developer Onboarding & First App Activation Journey */}
+      <DeveloperActivationWidget
+        apps={analytics?.recentApps || []}
+        profile={analytics?.developerProfile || {}}
+      />
+
       {/* 2. KEY METRICS STATS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5">
+        {/* Metric 0: Publishing Credits */}
+        <Card padding="md" className="flex flex-col justify-between bg-gradient-to-br from-indigo-500/10 to-purple-500/10 border-indigo-500/20">
+          <div className="flex items-start justify-between">
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-mono text-indigo-400 uppercase tracking-wider font-semibold">
+                Publishing Credits
+              </span>
+              <span className="text-3xl font-extrabold font-heading text-content-primary">
+                {loading ? '...' : analytics?.activeSubscription?.publishingCredits ? (analytics.activeSubscription.publishingCredits.total - analytics.activeSubscription.publishingCredits.used) : '0'}
+              </span>
+            </div>
+            <div className="p-2.5 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 shadow-[0_0_15px_rgba(99,102,241,0.2)]">
+              <Sparkles className="w-5 h-5" />
+            </div>
+          </div>
+          <div className="mt-4 pt-3 border-t border-indigo-500/20 flex items-center justify-between text-xs font-mono">
+            <span className="text-content-dim">
+              {loading ? '...' : `${analytics?.activeSubscription?.publishingCredits?.used || 0} / ${analytics?.activeSubscription?.publishingCredits?.total || 0} Used`}
+            </span>
+            <Link to="/developer/subscription" className="text-indigo-400 hover:text-indigo-300 font-semibold flex items-center gap-1">
+              Upgrade <ArrowRight className="w-3 h-3" />
+            </Link>
+          </div>
+        </Card>
+
         {/* Metric 1: Total Applications */}
         <Card padding="md" className="flex flex-col justify-between">
           <div className="flex items-start justify-between">
@@ -248,6 +280,8 @@ export const DeveloperDashboardPage = () => {
                     <th className="py-3.5 px-4 font-semibold">Category</th>
                     <th className="py-3.5 px-4 font-semibold">Status</th>
                     <th className="py-3.5 px-4 font-semibold">Downloads</th>
+                    <th className="py-3.5 px-4 font-semibold">Rating</th>
+                    <th className="py-3.5 px-4 font-semibold">Reviews</th>
                     <th className="py-3.5 px-4 font-semibold">Last Updated</th>
                     <th className="py-3.5 px-4 font-semibold text-right">Actions</th>
                   </tr>
@@ -287,6 +321,12 @@ export const DeveloperDashboardPage = () => {
                       </td>
                       <td className="py-3.5 px-4 font-mono text-content-primary">
                         {formatNumber(app.downloadCount || 0)}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-amber-400">
+                        {app.ratingAverage ? `${app.ratingAverage} ⭐` : 'N/A'}
+                      </td>
+                      <td className="py-3.5 px-4 font-mono text-content-dim">
+                        {formatNumber(app.ratingCount || 0)}
                       </td>
                       <td className="py-3.5 px-4 font-mono text-content-dim">
                         {formatDate(app.updatedAt)}

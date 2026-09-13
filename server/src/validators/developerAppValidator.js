@@ -168,6 +168,10 @@ export const updateAppValidation = [
     .optional()
     .custom(isValidWebUrl)
     .withMessage('Demo URL must be a valid HTTP/HTTPS URL'),
+  body('externalApkUrl')
+    .optional()
+    .custom(isValidWebUrl)
+    .withMessage('External APK URL must be a valid HTTP/HTTPS URL'),
 ];
 
 /**

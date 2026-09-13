@@ -29,8 +29,8 @@ export const AdminAppsPage = () => {
       };
 
       const res = await adminApi.getApps(params);
-      setApps(res.data?.data?.apps || []);
-      setPagination(res.data?.data?.pagination || { page: 1, pages: 1, total: 0 });
+      setApps(res.data?.apps || []);
+      setPagination(res.data?.pagination || { page: 1, pages: 1, total: 0 });
     } catch (err) {
       console.error('Failed to fetch apps:', err);
     } finally {

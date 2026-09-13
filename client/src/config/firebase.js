@@ -6,6 +6,7 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  sendEmailVerification,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -51,6 +52,7 @@ export {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  sendEmailVerification,
   collection,
   doc,
   getDoc,

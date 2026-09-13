@@ -4,6 +4,8 @@ import Category from '../models/Category.js';
 import { generateUniqueSlug } from '../utils/slug.js';
 import { SubscriptionLimitService } from '../services/admin/subscriptionLimitService.js';
 import { NotificationService } from '../services/admin/notificationService.js';
+import EventTrackingService from '../services/eventTrackingService.js';
+import ActivityLogService from '../services/activityLogService.js';
 
 /**
  * Escapes regex special characters to prevent ReDoS
@@ -416,6 +418,26 @@ export const submitApp = async (req, res, next) => {
       resourceType: 'APP',
       resourceId: app._id.toString(),
     });
+
+    // Sprint 10 Event Tracking & Activity Logging
+    EventTrackingService.track(EventTrackingService.EVENT_TYPES.APP_PUBLISHED, {
+      appId: app._id,
+      userId: req.user._id,
+      developerId: req.user._id,
+      metadata: { appName: app.name, category: app.category },
+    }).catch(() => {});
+
+    ActivityLogService.logActivity({
+      actorId: req.user._id,
+      actorRole: 'DEVELOPER',
+      actorEmail: req.user.email,
+      action: ActivityLogService.ACTIONS.DEVELOPER_PUBLISHED_APP,
+      resourceType: 'APP',
+      resourceId: app._id,
+      reason: 'Application submitted for platform review',
+      metadata: { appName: app.name },
+      ipAddress: req.ip,
+    }).catch(() => {});
 
     return res.status(200).json({
       success: true,

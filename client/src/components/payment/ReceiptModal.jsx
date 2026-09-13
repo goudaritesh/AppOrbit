@@ -60,7 +60,7 @@ export const ReceiptModal = ({ payment, isOpen, onClose }) => {
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-surface border border-white/10 p-1.5 flex items-center justify-center">
-                <img src="/logo.svg" alt="AppOrbit" className="w-full h-full object-contain" />
+                <img src="/logo.png" alt="AppOrbit" className="w-full h-full object-cover" />
               </div>
               <div>
                 <h2 className="font-heading font-extrabold text-lg tracking-tight">

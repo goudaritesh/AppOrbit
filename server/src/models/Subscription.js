@@ -41,22 +41,21 @@ const subscriptionSchema = new mongoose.Schema(
       type: Date,
       default: null, // null for lifetime free
     },
+    usageResetDate: {
+      type: Date,
+      default: null,
+    },
     cancelledAt: {
       type: Date,
       default: null,
     },
-    appsLimit: {
-      type: Number,
-      required: true,
-      default: 1,
+    publishingCredits: {
+      total: { type: Number, default: 1 },
+      used: { type: Number, default: 0 },
     },
-    applicationsUsed: {
-      type: Number,
-      default: 0,
-      min: 0,
-    },
-    usageResetDate: {
-      type: Date,
+    upgradedFrom: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'SubscriptionPlan',
       default: null,
     },
     autoRenew: {
@@ -114,15 +113,17 @@ subscriptionSchema.virtual('planId').get(function () {
 });
 
 subscriptionSchema.virtual('appLimit').get(function () {
-  return this.appsLimit;
+  return this.publishingCredits?.total || 0;
 }).set(function (val) {
-  this.appsLimit = val;
+  if (!this.publishingCredits) this.publishingCredits = {};
+  this.publishingCredits.total = val;
 });
 
 subscriptionSchema.virtual('appsUsed').get(function () {
-  return this.applicationsUsed;
+  return this.publishingCredits?.used || 0;
 }).set(function (val) {
-  this.applicationsUsed = val;
+  if (!this.publishingCredits) this.publishingCredits = {};
+  this.publishingCredits.used = val;
 });
 
 subscriptionSchema.virtual('paymentId').get(function () {
@@ -130,7 +131,7 @@ subscriptionSchema.virtual('paymentId').get(function () {
 });
 
 subscriptionSchema.virtual('applicationLimit').get(function () {
-  return this.appsLimit;
+  return this.publishingCredits?.total || 0;
 });
 
 subscriptionSchema.virtual('expiresAt').get(function () {

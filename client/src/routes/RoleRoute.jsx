@@ -24,6 +24,10 @@ export const RoleRoute = ({ allowedRoles = [], children }) => {
     (userRole === 'SUPER_ADMIN' && normalizedAllowed.includes('ADMIN'));
 
   if (!hasRole) {
+    // If a normal user tries to access a developer route, redirect to pricing/trial page
+    if (userRole === 'USER' && normalizedAllowed.includes('DEVELOPER')) {
+      return <Navigate to="/pricing" replace />;
+    }
     return <Navigate to="/unauthorized" replace />;
   }
 

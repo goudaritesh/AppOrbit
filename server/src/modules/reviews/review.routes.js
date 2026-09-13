@@ -13,7 +13,8 @@ import {
   getDeveloperReviews,
 } from './review.controller.js';
 import { protect, optionalAuth, authorizeRoles } from '../../middleware/authMiddleware.js';
-import { reviewRateLimiter } from '../../middleware/reviewRateLimiter.js';
+import { reviewRateLimiter } from '../../middleware/rateLimitMiddleware.js';
+import { createReviewValidation, replyReviewValidation } from '../../validators/reviewValidator.js';
 
 const router = Router();
 
@@ -40,8 +41,8 @@ router.delete('/:reviewId/helpful', protect, unvoteHelpful);
 router.post('/:reviewId/report', protect, reportReview);
 
 // Developer response (support both /respond and /reply per Sprint 7 spec)
-router.post('/:reviewId/respond', protect, authorizeRoles('DEVELOPER', 'ADMIN', 'SUPER_ADMIN'), developerReply);
-router.post('/:reviewId/reply', protect, authorizeRoles('DEVELOPER', 'ADMIN', 'SUPER_ADMIN'), developerReply);
+router.post('/:reviewId/respond', protect, authorizeRoles('DEVELOPER', 'ADMIN', 'SUPER_ADMIN'), replyReviewValidation, developerReply);
+router.post('/:reviewId/reply', protect, authorizeRoles('DEVELOPER', 'ADMIN', 'SUPER_ADMIN'), replyReviewValidation, developerReply);
 
 // Admin moderation shortcuts
 router.patch('/:reviewId/status', protect, authorizeRoles('ADMIN', 'SUPER_ADMIN'), moderateReview);
@@ -54,5 +55,5 @@ export default router;
    ========================================== */
 export const appReviewRouter = Router({ mergeParams: true });
 
-appReviewRouter.post('/', protect, reviewRateLimiter, createReview);
+appReviewRouter.post('/', protect, reviewRateLimiter, createReviewValidation, createReview);
 appReviewRouter.get('/', optionalAuth, getAppReviews);

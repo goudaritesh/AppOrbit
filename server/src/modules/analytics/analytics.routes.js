@@ -35,6 +35,17 @@ developerAnalyticsRouter.get(
   getAppAnalytics
 );
 
+import {
+  getPlatformOverviewAnalytics,
+  getRevenueAnalytics,
+  getUserAnalytics,
+  getAppAnalytics as getAdminAppAnalytics,
+  getSearchAnalytics,
+  getActivityLogs,
+  getSystemHealth,
+  triggerDailyAggregation,
+} from '../../controllers/admin/adminAnalyticsController.js';
+
 /* ==========================================
    ADMIN PLATFORM ANALYTICS ROUTER HELPER (/api/admin)
    ========================================== */
@@ -44,5 +55,54 @@ adminAnalyticsRouter.get(
   '/analytics',
   protect,
   authorizeRoles('ADMIN', 'SUPER_ADMIN'),
-  getAdminPlatformAnalytics
+  getPlatformOverviewAnalytics
+);
+
+adminAnalyticsRouter.get(
+  '/analytics/revenue',
+  protect,
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  getRevenueAnalytics
+);
+
+adminAnalyticsRouter.get(
+  '/analytics/users',
+  protect,
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  getUserAnalytics
+);
+
+adminAnalyticsRouter.get(
+  '/analytics/apps',
+  protect,
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  getAdminAppAnalytics
+);
+
+adminAnalyticsRouter.get(
+  '/analytics/search',
+  protect,
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  getSearchAnalytics
+);
+
+adminAnalyticsRouter.post(
+  '/analytics/aggregate',
+  protect,
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  triggerDailyAggregation
+);
+
+adminAnalyticsRouter.get(
+  '/activity-logs',
+  protect,
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  getActivityLogs
+);
+
+adminAnalyticsRouter.get(
+  '/system-health',
+  protect,
+  authorizeRoles('ADMIN', 'SUPER_ADMIN'),
+  getSystemHealth
 );

@@ -42,9 +42,9 @@ const AdminPaymentsPage = () => {
         paymentMethod: filters.paymentMethod !== 'ALL' ? filters.paymentMethod : undefined
       };
       const res = await adminApi.getPayments(params);
-      if (res.data?.success) {
-        setPayments(res.data.data.payments || []);
-        setPagination(res.data.data.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
+      if (res.success) {
+        setPayments(res.data.payments || []);
+        setPagination(res.data.pagination || { page: 1, limit: 10, total: 0, pages: 1 });
       }
     } catch (err) {
       console.error('Failed to load payments:', err);
@@ -67,7 +67,7 @@ const AdminPaymentsPage = () => {
         decision: verifyModal.decision,
         reason: reason.trim()
       });
-      if (res.data?.success) {
+      if (res.success) {
         toast.success(`Payment successfully marked as ${verifyModal.decision}`);
         setVerifyModal({ isOpen: false, payment: null, decision: 'APPROVED' });
         fetchPayments(pagination.page);
@@ -317,12 +317,12 @@ const AdminPaymentsPage = () => {
             </div>
 
             {/* Receipt / Proof Image if available */}
-            {detailsModal.payment.receiptUrl && (
+            {detailsModal.payment.screenshotUrl && (
               <div className="space-y-1.5">
                 <span className="font-semibold text-white">Submitted Payment Proof:</span>
                 <div className="rounded-lg overflow-hidden border border-border-primary bg-black max-h-64 flex items-center justify-center">
                   <img
-                    src={detailsModal.payment.receiptUrl}
+                    src={detailsModal.payment.screenshotUrl}
                     alt="Payment Proof"
                     className="object-contain max-h-64 w-full"
                   />
@@ -331,10 +331,10 @@ const AdminPaymentsPage = () => {
             )}
 
             {/* Audit Notes */}
-            {detailsModal.payment.verificationNotes && (
+            {detailsModal.payment.rejectionReason && (
               <div className="p-3 bg-surface-secondary rounded-lg border border-border-primary text-text-secondary">
                 <div className="font-semibold text-white mb-1">Verification Note:</div>
-                <p>{detailsModal.payment.verificationNotes}</p>
+                <p>{detailsModal.payment.rejectionReason}</p>
               </div>
             )}
 

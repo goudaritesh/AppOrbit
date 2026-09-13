@@ -20,11 +20,12 @@ class StorageService {
 
   /**
    * Deterministically generates a secure, randomized storage key
+   * Uses state (temporary, verified, quarantine) as the root folder
    */
-  generateStorageKey(developerId, appId, versionId, originalName = 'app.apk') {
+  generateStorageKey(developerId, appId, versionId, originalName = 'app.apk', state = 'temporary') {
     const randomId = crypto.randomUUID();
     const sanitizedExt = path.extname(originalName).toLowerCase() || '.apk';
-    return `apks/${appId}/${versionId}/${randomId}${sanitizedExt}`;
+    return `${state}/${appId}/${versionId}/${randomId}${sanitizedExt}`;
   }
 
   /**
@@ -53,6 +54,17 @@ class StorageService {
    */
   async deleteApk(params) {
     return await this.adapter.deleteApk(params);
+  }
+
+  /**
+   * Moves APK binary between lifecycle states (e.g., temporary -> verified)
+   */
+  async moveApk(params) {
+    if (this.adapter.moveApk) {
+      return await this.adapter.moveApk(params);
+    }
+    // Fallback for S3 if move is not implemented, copy then delete
+    throw new Error('moveApk not implemented on adapter');
   }
 
   /**

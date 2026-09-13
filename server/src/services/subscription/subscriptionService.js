@@ -3,6 +3,9 @@ import { SubscriptionPlan, DEFAULT_PLANS } from '../../models/SubscriptionPlan.j
 import { User } from '../../models/User.js';
 import { emitToUser } from '../../realtime/socket.js';
 import AppError from '../../utils/AppError.js';
+import CreditTransaction from '../../models/CreditTransaction.js';
+import EventTrackingService from '../eventTrackingService.js';
+import ActivityLogService from '../activityLogService.js';
 
 /**
  * Centralized Subscription Lifecycle Service (Phase 8 Production Implementation)
@@ -36,37 +39,57 @@ export class SubscriptionService {
       throw new AppError('Developer account not found', 404);
     }
 
-    // 1. Cancel previous active subscriptions gracefully
-    await Subscription.updateMany(
-      { developer: developerId, status: 'ACTIVE' },
-      { $set: { status: 'CANCELLED', cancelledAt: new Date() } }
-    );
-
-    // 2. Compute date boundaries
-    const startDate = new Date();
-    let endDate = null;
-    let usageResetDate = new Date();
-    usageResetDate.setDate(usageResetDate.getDate() + 30);
-
-    if (plan.slug !== 'free') {
-      endDate = new Date();
-      endDate.setDate(endDate.getDate() + durationDays);
+    // 1. Get current active subscription (if any) to preserve used credits
+    const activeSub = await Subscription.findOne({ developer: developerId, status: 'ACTIVE' });
+    let previouslyUsedCredits = 0;
+    if (activeSub && activeSub.publishingCredits) {
+      previouslyUsedCredits = activeSub.publishingCredits.used || 0;
+      
+      // Cancel previous active subscriptions gracefully
+      await Subscription.updateMany(
+        { developer: developerId, status: 'ACTIVE' },
+        { $set: { status: 'CANCELLED', cancelledAt: new Date() } }
+      );
     }
 
-    // 3. Create active subscription
+    // 2. Compute date boundaries (Lifetime by default for plans)
+    const startDate = new Date();
+    let endDate = null;
+    const usageResetDate = new Date();
+    usageResetDate.setFullYear(usageResetDate.getFullYear() + 1);
+
+    // 3. Create active subscription preserving used credits
     const subscription = await Subscription.create({
       developer: developerId,
       plan: plan._id,
       planSlug: plan.slug,
       status: 'ACTIVE',
-      billingPeriod: plan.billingPeriod || 'MONTHLY',
+      billingPeriod: plan.billingPeriod || 'ONE-TIME',
       startDate,
       endDate,
-      appsLimit: plan.appLimit,
-      applicationsUsed: 0,
       usageResetDate,
-      autoRenew,
+      publishingCredits: {
+        total: plan.publishingCredits,
+        used: previouslyUsedCredits,
+      },
       paymentReference: paymentId ? paymentId.toString() : '',
+    });
+
+    // 4. Log the Credit Transaction for adding credits
+    await CreditTransaction.create({
+      developer: developerId,
+      subscription: subscription._id,
+      transactionType: 'CREDIT_ADDED',
+      amount: plan.publishingCredits,
+      reason: `Purchased ${plan.name} Plan`,
+      previousBalance: {
+        total: activeSub ? activeSub.publishingCredits?.total : 0,
+        used: previouslyUsedCredits,
+      },
+      newBalance: {
+        total: plan.publishingCredits,
+        used: previouslyUsedCredits,
+      },
     });
 
     // 4. Emit live real-time event to developer session
@@ -76,13 +99,70 @@ export class SubscriptionService {
         id: plan._id,
         name: plan.name,
         slug: plan.slug,
-        appLimit: plan.appLimit,
+        publishingCredits: plan.publishingCredits,
       },
       expiresAt: endDate,
-      remainingApps: plan.appLimit,
+      remainingCredits: plan.publishingCredits - previouslyUsedCredits,
     });
 
+    // 5. Track analytics event and record activity log (Sprint 10)
+    EventTrackingService.track(EventTrackingService.EVENT_TYPES.SUBSCRIPTION_CREATED, {
+      userId: developerId,
+      developerId,
+      metadata: { planId: plan._id, planSlug: plan.slug, planName: plan.name },
+    }).catch(() => {});
+
+    ActivityLogService.logActivity({
+      actorId: developerId,
+      actorRole: 'DEVELOPER',
+      action: ActivityLogService.ACTIONS.SUBSCRIPTION_CHANGED,
+      resourceType: 'SUBSCRIPTION',
+      resourceId: subscription._id,
+      reason: `Subscription activated for ${plan.name}`,
+      metadata: { planSlug: plan.slug, planTier: plan.tier },
+    }).catch(() => {});
+
     return subscription;
+  }
+
+  /**
+   * Consume a publishing credit when an app is approved/published.
+   * Updates do NOT consume credits.
+   */
+  static async consumePublishingCredit(developerId, appId) {
+    const activeSub = await Subscription.findOne({
+      developer: developerId,
+      status: 'ACTIVE',
+    });
+
+    if (!activeSub) throw new AppError('No active subscription found', 400);
+
+    if (activeSub.publishingCredits.used >= activeSub.publishingCredits.total) {
+      throw new AppError('Insufficient publishing credits. Please upgrade your plan or purchase an add-on.', 403);
+    }
+
+    const previousUsed = activeSub.publishingCredits.used;
+    activeSub.publishingCredits.used += 1;
+    await activeSub.save();
+
+    await CreditTransaction.create({
+      developer: developerId,
+      subscription: activeSub._id,
+      transactionType: 'CREDIT_CONSUMED',
+      amount: 1,
+      reason: `Published application (${appId})`,
+      relatedApp: appId,
+      previousBalance: {
+        total: activeSub.publishingCredits.total,
+        used: previousUsed,
+      },
+      newBalance: {
+        total: activeSub.publishingCredits.total,
+        used: activeSub.publishingCredits.used,
+      },
+    });
+
+    return activeSub;
   }
 
   /**
@@ -173,7 +253,10 @@ export class SubscriptionService {
         plan: freePlan._id,
         planSlug: freePlan.slug,
         status: 'ACTIVE',
-        appsLimit: freePlan.appLimit,
+        publishingCredits: {
+          total: freePlan.publishingCredits,
+          used: sub.publishingCredits?.used || 0
+        },
         startDate: new Date(),
       });
     }

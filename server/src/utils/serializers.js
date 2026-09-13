@@ -103,6 +103,8 @@ export const serializePublicApp = (app) => {
     ratingAverage: raw.ratingAverage || 0,
     ratingCount: raw.ratingCount || 0,
     featured: Boolean(raw.featured),
+    badge: raw.badge || 'NONE',
+    isStudentProject: Boolean(raw.isStudentProject),
     publishedAt: raw.publishedAt || raw.createdAt,
     createdAt: raw.createdAt,
     updatedAt: raw.updatedAt,

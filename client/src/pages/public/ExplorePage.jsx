@@ -15,6 +15,7 @@ import {
 import AppCard from '../../components/apps/AppCard';
 import Button from '../../components/ui/Button';
 import EmptyState from '../../components/common/EmptyState';
+import SEOHead from '../../components/common/SEOHead';
 import { getApps } from '../../api/appsApi';
 import { getCategories } from '../../api/categoriesApi';
 import useDebounce from '../../hooks/useDebounce';
@@ -38,6 +39,15 @@ const SORT_OPTIONS = [
   { value: 'alphabetical', label: 'Alphabetical (A-Z)' },
 ];
 
+const DISCOVERY_CHIPS = [
+  { id: 'all', label: 'All Apps' },
+  { id: 'trending', label: '🔥 Trending' },
+  { id: 'top_rated', label: '⭐ Top Rated' },
+  { id: 'student_projects', label: '🎓 Student Projects' },
+  { id: 'featured', label: '🌟 Featured' },
+  { id: 'editors_choice', label: '👑 Editor’s Choice' },
+];
+
 export const ExplorePage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { category: pathCategory } = useParams();
@@ -49,6 +59,7 @@ export const ExplorePage = () => {
   const urlTech = searchParams.get('technology') || '';
   const urlVerified = searchParams.get('verified') === 'true';
   const urlSort = searchParams.get('sort') || 'popular';
+  const urlFilter = searchParams.get('filter') || 'all';
   const urlPage = parseInt(searchParams.get('page'), 10) || 1;
 
   // Local filter states
@@ -60,6 +71,7 @@ export const ExplorePage = () => {
   const [selectedTech, setSelectedTech] = useState(urlTech);
   const [verifiedOnly, setVerifiedOnly] = useState(urlVerified);
   const [sortBy, setSortBy] = useState(urlSort);
+  const [selectedFilter, setSelectedFilter] = useState(urlFilter);
   const [page, setPage] = useState(urlPage);
 
   // Data states
@@ -102,6 +114,7 @@ export const ExplorePage = () => {
         params.set('technology', newParams.technology);
       if (newParams.verified) params.set('verified', 'true');
       if (newParams.sort && newParams.sort !== 'popular') params.set('sort', newParams.sort);
+      if (newParams.filter && newParams.filter !== 'all') params.set('filter', newParams.filter);
       if (newParams.page > 1) params.set('page', newParams.page.toString());
 
       setSearchParams(params, { replace: true });
@@ -125,6 +138,7 @@ export const ExplorePage = () => {
       if (selectedPlatform) params.platform = selectedPlatform;
       if (selectedTech && selectedTech !== 'All') params.technology = selectedTech;
       if (verifiedOnly) params.verified = 'true';
+      if (selectedFilter && selectedFilter !== 'all') params.filter = selectedFilter;
 
       const res = await getApps(params);
       setApps(res.data?.apps || []);
@@ -135,7 +149,7 @@ export const ExplorePage = () => {
     } finally {
       setLoading(false);
     }
-  }, [debouncedSearch, selectedCategory, selectedPlatform, selectedTech, verifiedOnly, sortBy, page]);
+  }, [debouncedSearch, selectedCategory, selectedPlatform, selectedTech, verifiedOnly, sortBy, selectedFilter, page]);
 
   // Trigger fetch and sync URL whenever filter state changes
   useEffect(() => {
@@ -192,6 +206,21 @@ export const ExplorePage = () => {
 
   return (
     <div className="max-w-content-max mx-auto px-4 sm:px-6 lg:px-8 py-10 min-h-[85vh]">
+      <SEOHead
+        title={
+          activeCategoryObj
+            ? `${activeCategoryObj.name} Android Apps`
+            : debouncedSearch
+            ? `"${debouncedSearch}" — App Search Results`
+            : 'Explore Android Apps'
+        }
+        description={
+          activeCategoryObj
+            ? `Browse the best ${activeCategoryObj.name} Android apps on AppOrbit. Discover verified APKs from independent developers.`
+            : `Explore ${pagination.total || 'hundreds of'} verified Android apps on AppOrbit. Filter by category, platform, technology, and more.`
+        }
+        canonicalUrl={`${window.location.origin}/explore`}
+      />
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
@@ -478,6 +507,26 @@ export const ExplorePage = () => {
 
         {/* APPLICATION GRID & RESULTS */}
         <main className="md:col-span-3 flex flex-col gap-6">
+          {/* Sprint 13 Discovery Filter Chips */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
+            {DISCOVERY_CHIPS.map((chip) => (
+              <button
+                key={chip.id}
+                onClick={() => {
+                  setSelectedFilter(chip.id);
+                  setPage(1);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer ${
+                  selectedFilter === chip.id
+                    ? 'bg-primary text-white shadow-md shadow-primary/25 border border-primary'
+                    : 'bg-surface text-content-muted hover:text-content-primary border border-white/10 hover:border-white/20'
+                }`}
+              >
+                {chip.label}
+              </button>
+            ))}
+          </div>
+
           {/* Active Filter Badges & Count */}
           <div className="flex items-center justify-between text-xs font-mono text-content-dim">
             <span>

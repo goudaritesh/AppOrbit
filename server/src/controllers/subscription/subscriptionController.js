@@ -20,10 +20,15 @@ export const getPublicPlans = async (req, res, next) => {
       await SubscriptionPlan.insertMany(DEFAULT_PLANS);
       plans = await SubscriptionPlan.find({ isActive: true }).sort({ displayOrder: 1 });
     } else {
-      const diamond = plans.find((p) => p.slug === 'diamond');
-      if (diamond && diamond.appLimit !== 20) {
-        diamond.appLimit = 20;
-        await diamond.save();
+      let needsSave = false;
+      for (const plan of plans) {
+        if (plan.publishingCredits === undefined || plan.publishingCredits === null) {
+          const defaultPlan = DEFAULT_PLANS.find(p => p.slug === plan.slug);
+          if (defaultPlan) {
+            plan.publishingCredits = defaultPlan.publishingCredits;
+            await plan.save();
+          }
+        }
       }
     }
     return res.status(200).json({
@@ -122,12 +127,27 @@ export const changePlan = async (req, res, next) => {
       });
     }
 
-    // For upgrades, redirect to payment checkout flow
+    // Get current plan details to calculate upgrade price
+    const currentPlan = currentSub.plan;
+    let upgradePrice = targetPlan.price;
+    
+    // Pay the difference logic
+    if (currentPlan && currentPlan.price) {
+      upgradePrice = targetPlan.price - currentPlan.price;
+    }
+    
+    // Ensure we don't go negative (edge case)
+    if (upgradePrice < 0) {
+      upgradePrice = 0;
+    }
+
+    // For upgrades, redirect to payment checkout flow with the prorated amount
     return res.status(200).json({
       success: true,
       requiresPayment: true,
       message: 'Upgrade requires payment confirmation.',
       targetPlan,
+      upgradePrice,
     });
   } catch (err) {
     next(err);

@@ -10,9 +10,17 @@ import {
   resendVerification,
   getMe,
   updateProfile,
+  googleLogin,
+  firebaseLogin,
+  firebaseSignup,
+  upgradeToTrial,
 } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { authRateLimiter } from '../middleware/authRateLimiter.js';
+import {
+  loginRateLimiter,
+  registerRateLimiter,
+} from '../middleware/rateLimitMiddleware.js';
 import {
   validate,
   signupValidation,
@@ -24,10 +32,13 @@ import {
 
 const router = Router();
 
-// Public Authentication Endpoints
-router.post('/signup', authRateLimiter, validate(signupValidation), signup);
-router.post('/register', authRateLimiter, validate(signupValidation), signup);
-router.post('/login', authRateLimiter, validate(loginValidation), login);
+// Public Authentication Endpoints (Sprint 11 Rate-Hardened)
+router.post('/signup', registerRateLimiter, validate(signupValidation), signup);
+router.post('/register', registerRateLimiter, validate(signupValidation), signup);
+router.post('/login', loginRateLimiter, validate(loginValidation), login);
+router.post('/google', loginRateLimiter, googleLogin);
+router.post('/firebase-login', loginRateLimiter, firebaseLogin);
+router.post('/firebase-signup', registerRateLimiter, firebaseSignup);
 router.post('/logout', logout);
 router.post('/refresh-token', refreshToken);
 
@@ -48,10 +59,13 @@ router.post(
 // Email Verification Flow
 router.get('/verify-email/:token', verifyEmail);
 router.post('/verify-email', verifyEmail);
-router.post('/resend-verification', authRateLimiter, resendVerification);
+router.post('/resend-verification', protect, authRateLimiter, resendVerification);
 
 // Authenticated Profile Endpoints
 router.get('/me', protect, getMe);
 router.patch('/profile', protect, validate(updateProfileValidation), updateProfile);
+
+// Upgrade to Developer Free Trial
+router.post('/upgrade-trial', protect, upgradeToTrial);
 
 export default router;

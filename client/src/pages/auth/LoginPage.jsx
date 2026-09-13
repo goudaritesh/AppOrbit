@@ -3,10 +3,12 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import toast from 'react-hot-toast';
 import { Lock, Mail, ArrowRight, ShieldCheck, AlertCircle, RotateCcw } from 'lucide-react';
+import { GoogleLogin } from '@react-oauth/google';
 import Input from '../../components/ui/Input';
 import Button from '../../components/ui/Button';
 import { authApi } from '../../api/authApi';
 import { setCredentials } from '../../store/slices/authSlice';
+import { auth, signInWithEmailAndPassword, sendEmailVerification } from '../../config/firebase';
 
 export const LoginPage = () => {
   const [email, setEmail] = useState('');
@@ -26,43 +28,77 @@ export const LoginPage = () => {
 
     setIsLoading(true);
     try {
-      const response = await authApi.login({ email, password });
-      const { accessToken, user } = response.data;
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
 
-      // Update Redux authentication state
-      dispatch(setCredentials({ accessToken, user }));
-      toast.success(`Welcome back, ${user.name}!`);
-
-      // Determine redirection path based on authenticated role
-      const intendedDestination = location.state?.from;
-
-      if (intendedDestination) {
-        navigate(intendedDestination, { replace: true });
-      } else if (['ADMIN', 'SUPER_ADMIN'].includes(user.role)) {
-        navigate('/admin', { replace: true });
-      } else if (user.role === 'DEVELOPER') {
-        navigate('/developer', { replace: true });
-      } else {
-        navigate('/', { replace: true });
-      }
-    } catch (err) {
-      if (err.emailVerified === false) {
-        setUnverifiedEmail(err.email || email);
+      if (!firebaseUser.emailVerified) {
+        setUnverifiedEmail(firebaseUser.email);
         toast.error('Please verify your email address to continue.');
+        setIsLoading(false);
+        return;
+      }
+
+      const idToken = await firebaseUser.getIdToken();
+      const response = await authApi.firebaseLogin({ idToken });
+      
+      const { accessToken, user } = response.data;
+      dispatch(setCredentials({ accessToken, user }));
+      toast.success(`Welcome back, ${user.name.split(' ')[0]}!`);
+
+      const from = location.state?.from?.pathname || (user.role === 'DEVELOPER' ? '/developer/dashboard' : (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') ? '/admin/dashboard' : '/');
+      navigate(from, { replace: true });
+    } catch (err) {
+      if (err.code === 'PROFILE_NOT_FOUND' || err.response?.data?.code === 'PROFILE_NOT_FOUND') {
+        const idToken = await auth.currentUser?.getIdToken();
+        toast.success('Firebase login successful. Please complete your profile.');
+        navigate('/complete-profile', { state: { idToken } });
+      } else if (err.code === 'auth/invalid-credential' || err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+        toast.error('Invalid email or password.');
       } else {
-        toast.error(err.message || 'Invalid email or password.');
+        toast.error(err.response?.data?.message || err.message || 'Login failed.');
       }
     } finally {
       setIsLoading(false);
     }
   };
 
+  const handleGoogleSuccess = async (credentialResponse) => {
+    setIsLoading(true);
+    setUnverifiedEmail(null);
+    try {
+      const response = await authApi.googleLogin({
+        credential: credentialResponse.credential,
+        role: 'USER', // Defaults to USER, they can switch to DEVELOPER in profile if needed
+      });
+      const { accessToken, user } = response.data;
+
+      dispatch(setCredentials({ accessToken, user }));
+      toast.success(`Welcome back, ${user.name.split(' ')[0]}!`);
+
+      const from = location.state?.from?.pathname || (user.role === 'DEVELOPER' ? '/developer/dashboard' : (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') ? '/admin/dashboard' : '/');
+      navigate(from, { replace: true });
+    } catch (err) {
+      if (err.code === 'EMAIL_UNVERIFIED') {
+        setUnverifiedEmail(err.email || email);
+        toast.error('Please verify your Google email address to continue.');
+      } else {
+        toast.error(err.message || 'Google authentication failed.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+
   const handleResendVerification = async () => {
-    if (!unverifiedEmail) return;
     setIsResending(true);
     try {
-      const res = await authApi.resendVerification(unverifiedEmail);
-      toast.success(res.message || 'Verification link sent to your email.');
+      if (auth.currentUser) {
+        await sendEmailVerification(auth.currentUser);
+        toast.success('Verification link sent to your email.');
+      } else {
+        toast.error('Session expired. Please try logging in again.');
+      }
     } catch (err) {
       toast.error(err.message || 'Failed to resend verification.');
     } finally {
@@ -76,9 +112,7 @@ export const LoginPage = () => {
         {/* Brand Banner */}
         <div className="text-center mb-8">
           <Link to="/" className="inline-flex items-center gap-2.5 mb-4 group">
-            <div className="w-10 h-10 rounded-xl bg-surface border border-white/10 flex items-center justify-center p-2 shadow-sm group-hover:border-primary/50 transition-colors">
-              <img src="/logo.svg" alt="AppOrbit" className="w-full h-full object-contain" />
-            </div>
+            <img src="/logo.png" alt="AppOrbit" className="w-12 h-12 rounded-xl object-cover shrink-0 group-hover:opacity-80 transition-opacity" />
           </Link>
           <h1 className="text-2xl font-bold font-heading text-content-primary tracking-tight">
             Sign in to AppOrbit
@@ -153,6 +187,23 @@ export const LoginPage = () => {
               Sign In
             </Button>
           </form>
+
+          <div className="mt-6 mb-6 relative flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center border-t border-white/10"></div>
+            <span className="relative z-10 px-3 bg-surface text-xs font-mono text-content-dim">OR</span>
+          </div>
+
+          <div className="flex justify-center w-full">
+            <GoogleLogin
+              onSuccess={handleGoogleSuccess}
+              onError={() => toast.error('Google login was unsuccessful. Please try again.')}
+              useOneTap
+              theme="filled_black"
+              shape="pill"
+              text="continue_with"
+              width="100%"
+            />
+          </div>
 
           {/* Registration Notice */}
           <div className="mt-6 pt-6 border-t border-white/5 text-center text-xs text-content-muted">

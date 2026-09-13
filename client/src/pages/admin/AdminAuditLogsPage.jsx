@@ -29,9 +29,9 @@ const AdminAuditLogsPage = () => {
         resourceType: filters.resourceType !== 'ALL' ? filters.resourceType : undefined
       };
       const res = await adminApi.getAuditLogs(params);
-      if (res.data?.success) {
-        setLogs(res.data.data.logs || []);
-        setPagination(res.data.data.pagination || { page: 1, limit: 15, total: 0, pages: 1 });
+      if (res.success) {
+        setLogs(res.data.logs || []);
+        setPagination(res.data.pagination || { page: 1, limit: 15, total: 0, pages: 1 });
       }
     } catch (err) {
       console.error('Failed to load audit logs:', err);

@@ -76,11 +76,6 @@ export const PricingCard = ({
           <span className="text-4xl font-heading font-extrabold text-content-primary tracking-tight">
             {priceFormatted}
           </span>
-          {!isFree && (
-            <span className="text-xs font-mono text-content-dim">
-              / {billingCycle.toLowerCase()}
-            </span>
-          )}
         </div>
 
         {/* Quota Highlight Box */}
@@ -88,12 +83,15 @@ export const PricingCard = ({
           <div className="text-[11px] font-mono text-content-dim uppercase tracking-wider mb-1">
             Publishing Quota
           </div>
-          <div className="text-sm font-semibold text-content-primary flex items-center gap-2">
+          <div className="text-sm font-semibold text-content-primary flex items-center gap-2 mb-3">
             <span className="text-accent-cyan font-mono text-base font-bold">
-              {plan.applicationLimit || plan.appLimit}
+              {plan.publishingCredits}
             </span>
-            <span>Application{plan.applicationLimit > 1 ? 's' : ''} Allowed</span>
+            <span>Application{plan.publishingCredits > 1 ? 's' : ''} Allowed</span>
           </div>
+          <p className="text-[11px] text-content-muted leading-relaxed mt-2">
+            Enjoy lifetime access with a single payment. Publish up to {plan.publishingCredits} application{plan.publishingCredits > 1 ? 's' : ''} annually, with your quota automatically refreshing every year.
+          </p>
         </div>
 
         {/* Features Checklist */}

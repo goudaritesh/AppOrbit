@@ -28,7 +28,12 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, 'Please provide a password'],
+      required: [
+        function () {
+          return this.authProvider === 'LOCAL';
+        },
+        'Please provide a password',
+      ],
       minlength: [8, 'Password must be at least 8 characters long'],
       select: false,
     },
@@ -49,6 +54,16 @@ const userSchema = new mongoose.Schema(
       },
       default: 'USER',
       index: true,
+    },
+    authProvider: {
+      type: String,
+      enum: ['LOCAL', 'GOOGLE'],
+      default: 'LOCAL',
+    },
+    googleId: {
+      type: String,
+      sparse: true,
+      unique: true,
     },
     accountStatus: {
       type: String,
@@ -88,6 +103,10 @@ const userSchema = new mongoose.Schema(
       },
     ],
     emailVerified: {
+      type: Boolean,
+      default: false,
+    },
+    freeTrialUsed: {
       type: Boolean,
       default: false,
     },
@@ -155,6 +174,54 @@ const userSchema = new mongoose.Schema(
     // Password reset fields
     passwordResetToken: String,
     passwordResetExpires: Date,
+
+    // Sprint 11 Account Protection & Lockout
+    failedLoginAttempts: {
+      type: Number,
+      default: 0,
+    },
+    lockUntil: {
+      type: Date,
+      default: null,
+    },
+
+    // Sprint 12 Beta Program Metadata
+    isBetaTester: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    betaJoinedAt: {
+      type: Date,
+      default: null,
+    },
+    betaStage: {
+      type: String,
+      enum: ['NONE', 'APPLIED', 'INVITED', 'ACTIVE', 'GRADUATED'],
+      default: 'NONE',
+      index: true,
+    },
+
+    // Sprint 13 Referral & Invitation Metadata
+    referralCode: {
+      type: String,
+      unique: true,
+      sparse: true,
+      uppercase: true,
+      trim: true,
+      index: true,
+    },
+    referredBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
+      index: true,
+    },
+    referralStats: {
+      totalReferred: { type: Number, default: 0 },
+      activatedDevelopers: { type: Number, default: 0 },
+      rewardedSlots: { type: Number, default: 0 },
+    },
   },
   {
     timestamps: true,
@@ -239,6 +306,45 @@ userSchema.methods.createPasswordResetToken = function () {
   this.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000);
 
   return rawToken;
+};
+
+/**
+ * Checks if the account is currently locked due to failed login attempts.
+ * @returns {boolean}
+ */
+userSchema.methods.isLocked = function () {
+  return Boolean(this.lockUntil && this.lockUntil.getTime() > Date.now());
+};
+
+/**
+ * Increments failed login count and locks account for 15 minutes if threshold (5) reached.
+ */
+userSchema.methods.incrementLoginAttempts = async function () {
+  // If a previous lock has expired, restart attempt count at 1
+  if (this.lockUntil && this.lockUntil.getTime() <= Date.now()) {
+    this.failedLoginAttempts = 1;
+    this.lockUntil = null;
+    return await this.save({ validateBeforeSave: false });
+  }
+
+  this.failedLoginAttempts = (this.failedLoginAttempts || 0) + 1;
+
+  // Lock account for 15 minutes upon reaching 5 failed attempts
+  if (this.failedLoginAttempts >= 5) {
+    this.lockUntil = new Date(Date.now() + 15 * 60 * 1000);
+  }
+
+  return await this.save({ validateBeforeSave: false });
+};
+
+/**
+ * Resets failed login attempts counter and unlocks account.
+ */
+userSchema.methods.resetLoginAttempts = async function () {
+  if (this.failedLoginAttempts === 0 && !this.lockUntil) return this;
+  this.failedLoginAttempts = 0;
+  this.lockUntil = null;
+  return await this.save({ validateBeforeSave: false });
 };
 
 export const User = mongoose.model('User', userSchema);

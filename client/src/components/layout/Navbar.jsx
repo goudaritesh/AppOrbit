@@ -31,9 +31,8 @@ export const Navbar = () => {
   const navLinks = [
     { label: 'Home', path: '/' },
     { label: 'Explore', path: '/explore' },
-    { label: 'Application Hub', path: '/hub' },
-    { label: 'Search', path: '/search' },
-    { label: 'Categories', path: '/categories' },
+    { label: 'Community', path: '/community' },
+    { label: 'About', path: '/about' },
   ];
 
   const isActive = (path) => {
@@ -61,9 +60,7 @@ export const Navbar = () => {
       <div className="max-w-content-max mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand Logo */}
         <Link to="/" className="flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-xl bg-surface-low border border-white/10 flex items-center justify-center p-1.5 shadow-sm group-hover:border-primary/50 transition-colors">
-            <img src="/logo.svg" alt="AppOrbit" className="w-full h-full object-contain" />
-          </div>
+          <img src="/logo.png" alt="AppOrbit" className="w-10 h-10 rounded-xl object-cover shrink-0 group-hover:opacity-80 transition-opacity" />
           <div className="flex flex-col">
             <span className="font-heading font-extrabold text-lg text-content-primary tracking-tight leading-none">
               App<span className="text-primary">Orbit</span>

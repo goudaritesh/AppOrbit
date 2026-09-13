@@ -15,6 +15,7 @@ import http from 'http';
 import app from './app.js';
 import { connectDB } from './src/config/db.js';
 import { initializeSocket } from './src/realtime/socket.js';
+import { initializeFirebaseAdmin } from './src/config/firebaseAdmin.js';
 
 const PORT = parseInt(process.env.PORT, 10) || 5000;
 
@@ -24,6 +25,9 @@ const PORT = parseInt(process.env.PORT, 10) || 5000;
 const startServer = async () => {
   // Connect to MongoDB
   await connectDB();
+
+  // Initialize Firebase Admin SDK
+  initializeFirebaseAdmin();
 
   const httpServer = http.createServer(app);
   initializeSocket(httpServer);
@@ -35,6 +39,16 @@ const startServer = async () => {
     console.log(` Health: http://localhost:${PORT}/api/health`);
     console.log(` Real-time WebSockets: Active (Socket.IO)`);
     console.log(`=========================================`);
+
+    // Sprint 10 System Health Snapshot Initializer
+    import('./src/jobs/systemHealthJob.js')
+      .then(({ runSystemHealthJob }) => {
+        runSystemHealthJob().catch(() => {});
+        setInterval(() => {
+          runSystemHealthJob().catch(() => {});
+        }, 10 * 60 * 1000); // Snapshot every 10 min
+      })
+      .catch((err) => console.warn('[SystemHealthJob] Init warning:', err.message));
   });
 
   const server = httpServer;

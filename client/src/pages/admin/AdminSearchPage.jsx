@@ -37,8 +37,8 @@ const AdminSearchPage = () => {
         setLoading(true);
         setSearchParams({ q: debouncedQuery.trim() });
         const res = await adminApi.globalSearch(debouncedQuery.trim());
-        if (res.data?.success) {
-          setResults(res.data.data.results);
+        if (res.success) {
+          setResults(res.data.results);
         }
       } catch (err) {
         console.error('Global search error:', err);

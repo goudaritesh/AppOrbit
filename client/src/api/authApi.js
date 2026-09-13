@@ -22,6 +22,30 @@ export const authApi = {
   },
 
   /**
+   * Authenticate or register with Google OAuth
+   * @param {object} payload - { credential, role }
+   */
+  googleLogin: async (payload) => {
+    return await apiClient.post('/auth/google', payload);
+  },
+
+  /**
+   * Authenticate with Firebase Email/Password token
+   * @param {object} payload - { idToken }
+   */
+  firebaseLogin: async (payload) => {
+    return await apiClient.post('/auth/firebase-login', payload);
+  },
+
+  /**
+   * Complete profile after Firebase registration
+   * @param {object} payload - { idToken, name, role }
+   */
+  firebaseSignup: async (payload) => {
+    return await apiClient.post('/auth/firebase-signup', payload);
+  },
+
+  /**
    * Logout user, clear server-side refresh token and cookie
    */
   logout: async () => {
@@ -80,6 +104,13 @@ export const authApi = {
    */
   updateProfile: async (profileData) => {
     return await apiClient.patch('/auth/profile', profileData);
+  },
+
+  /**
+   * Upgrades the user to developer role using 1-time free trial
+   */
+  upgradeToTrial: async () => {
+    return await apiClient.post('/auth/upgrade-trial');
   },
 };
 

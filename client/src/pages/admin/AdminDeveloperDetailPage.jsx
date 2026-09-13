@@ -42,7 +42,7 @@ export const AdminDeveloperDetailPage = () => {
     try {
       setLoading(true);
       const res = await adminApi.getDeveloperById(developerId);
-      const data = res.data?.data;
+      const data = res.data;
       setDeveloper(data.developer);
       setApps(data.apps || []);
       setSubscription(data.subscription);
@@ -79,7 +79,7 @@ export const AdminDeveloperDetailPage = () => {
   const openSubModal = async () => {
     try {
       const res = await adminApi.getSubscriptionPlans();
-      setPlans(res.data?.data?.plans || []);
+      setPlans(res.data?.plans || []);
       setSubModalOpen(true);
     } catch (err) {
       console.error(err);

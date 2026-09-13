@@ -6,6 +6,7 @@ import User from '../../models/User.js';
 import SearchHistory from '../../models/SearchHistory.js';
 import DownloadEvent from '../../models/DownloadEvent.js';
 import AnalyticsEvent from '../../models/AnalyticsEvent.js';
+import EventTrackingService from '../../services/eventTrackingService.js';
 
 export class SearchService {
   /**
@@ -32,16 +33,7 @@ export class SearchService {
       }).catch((err) => console.error('Error logging search history:', err.message));
     }
 
-    // Log analytics event
-    if (cleanQuery.length >= 2) {
-      AnalyticsEvent.create({
-        eventType: 'SEARCH',
-        user: userId,
-        metadata: { query: cleanQuery },
-      }).catch(() => {});
-    }
-
-    return await MongoSearchProvider.search({
+    const searchResult = await MongoSearchProvider.search({
       q: cleanQuery,
       category,
       technology,
@@ -51,6 +43,18 @@ export class SearchService {
       page,
       limit,
     });
+
+    // Log analytics event with result count and zero-result indicator
+    if (cleanQuery.length >= 2) {
+      const resultsCount = searchResult.pagination?.total || (searchResult.apps?.length || 0);
+      EventTrackingService.trackSearch(cleanQuery, {
+        userId,
+        resultsCount,
+        category,
+      }).catch(() => {});
+    }
+
+    return searchResult;
   }
 
   /**

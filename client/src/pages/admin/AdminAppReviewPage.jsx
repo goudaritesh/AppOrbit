@@ -44,7 +44,7 @@ export const AdminAppReviewPage = () => {
     try {
       setLoading(true);
       const res = await adminApi.getAppById(appId);
-      const data = res.data?.data;
+      const data = res.data;
       setApp(data.app);
       setVersions(data.versions || []);
       setSecurityReports(data.securityReports || []);

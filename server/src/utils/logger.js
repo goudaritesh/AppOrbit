@@ -73,6 +73,7 @@ function formatLog(level, message, metadata = {}) {
     INFO: '\x1b[32m',  // Green
     WARN: '\x1b[33m',  // Yellow
     ERROR: '\x1b[31m', // Red
+    SECURITY: '\x1b[35m\x1b[1m', // Bold Magenta
   };
   const reset = '\x1b[0m';
   const color = colorCodes[level] || reset;
@@ -101,6 +102,10 @@ export const logger = {
     if (currentLevel <= LOG_LEVELS.ERROR) {
       console.error(formatLog('ERROR', message, meta));
     }
+  },
+  security: (message, meta) => {
+    // Security events are always logged regardless of base level
+    console.warn(formatLog('SECURITY', message, meta));
   },
   redact,
 };

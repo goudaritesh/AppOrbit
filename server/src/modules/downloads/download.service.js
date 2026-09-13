@@ -8,6 +8,7 @@ import DownloadSession from '../../models/DownloadSession.js';
 import DownloadEvent from '../../models/DownloadEvent.js';
 import Download from '../../models/Download.js';
 import AnalyticsEvent from '../../models/AnalyticsEvent.js';
+import EventTrackingService from '../../services/eventTrackingService.js';
 
 export class DownloadService {
   /**
@@ -270,6 +271,11 @@ export class DownloadService {
           eventType: 'DOWNLOAD_COMPLETED',
           application: session.application,
           user: session.user,
+        }),
+        EventTrackingService.trackAppDownload(session.application, {
+          userId: session.user,
+          versionId: session.version,
+          metadata: { sessionId: session._id },
         }),
       ]);
     }

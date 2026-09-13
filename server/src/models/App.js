@@ -295,6 +295,18 @@ const appSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    // Sprint 13 App Badging & College Project Highlighting
+    badge: {
+      type: String,
+      enum: ['NONE', 'FEATURED', 'TRENDING', 'EDITORS_CHOICE', 'STUDENT_PROJECT', 'NEW_RELEASE'],
+      default: 'NONE',
+      index: true,
+    },
+    isStudentProject: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
     publishedAt: {
       type: Date,
       default: null,

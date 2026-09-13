@@ -3,6 +3,7 @@ import { protect } from '../middleware/authMiddleware.js';
 import { requireAdmin, requirePermission } from '../middleware/adminPermissionMiddleware.js';
 import { ADMIN_PERMISSIONS } from '../config/adminPermissions.js';
 import { getAdminReviews, moderateReview } from '../modules/reviews/review.controller.js';
+import { featureApp } from '../controllers/appController.js';
 
 // Controllers
 import {
@@ -115,6 +116,7 @@ router.post('/apps/:appId/request-changes', requirePermission(ADMIN_PERMISSIONS.
 router.patch('/apps/:appId/request-changes', requirePermission(ADMIN_PERMISSIONS.APP_REVIEW), requestChanges);
 router.post('/apps/:appId/block', requirePermission(ADMIN_PERMISSIONS.APP_BLOCK), blockApp);
 router.post('/apps/:appId/unpublish', requirePermission(ADMIN_PERMISSIONS.APP_APPROVE), unpublishApp);
+router.patch('/apps/:id/feature', requirePermission(ADMIN_PERMISSIONS.APP_APPROVE), featureApp);
 
 // ============================================================================
 // 4. DEVELOPER MANAGEMENT & SUBSCRIPTIONS

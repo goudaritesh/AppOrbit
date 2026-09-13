@@ -26,8 +26,8 @@ const AdminNotificationsPage = () => {
     try {
       setLoading(true);
       const res = await adminApi.getNotifications({ unreadOnly: filterUnread ? 'true' : undefined });
-      if (res.data?.success) {
-        setNotifications(res.data.data.notifications || []);
+      if (res.success) {
+        setNotifications(res.data.notifications || []);
       }
     } catch (err) {
       console.error('Failed to load notifications:', err);

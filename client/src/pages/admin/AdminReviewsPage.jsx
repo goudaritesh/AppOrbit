@@ -34,8 +34,8 @@ export const AdminReviewsPage = () => {
         page,
         limit: 15,
       });
-      setReviews(res.data.data.reviews || []);
-      setPagination(res.data.data.pagination);
+      setReviews(res.data.reviews || []);
+      setPagination(res.data.pagination);
     } catch (err) {
       toast.error('Failed to load reviews for moderation');
     } finally {
