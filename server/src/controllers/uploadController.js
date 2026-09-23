@@ -14,7 +14,6 @@ import { ApkHashService } from '../services/apk/apkHashService.js';
 import { storageService } from '../services/storage/storageService.js';
 import { ApkSecurityPipeline } from '../security/apkSecurityPipeline.js';
 import { apkQueue } from '../workers/apkQueue.js';
-import { globalQuotaService } from '../services/globalQuotaService.js';
 import fs from 'fs';
 
 /**
@@ -246,14 +245,6 @@ export const uploadAppApk = async (req, res, next) => {
 
     const { originalname, size, mimetype, path: tempFilePath } = req.file;
 
-    // 0. Global Storage Quota Check (10 GB Hard Limit)
-    try {
-      await globalQuotaService.checkStorageQuota(size);
-    } catch (err) {
-      fs.unlink(tempFilePath, () => {});
-      return res.status(403).json({ success: false, code: err.code || 'QUOTA_EXCEEDED', message: err.message });
-    }
-
     // 1. Layered APK validation
     const extCheck = ApkValidationService.validateExtension(originalname);
     if (!extCheck.valid) {
@@ -442,6 +433,143 @@ export const deleteMedia = async (req, res, next) => {
     // Treat as screenshotId
     req.params.screenshotId = mediaId;
     return deleteScreenshot(req, res, next);
+  } catch (err) {
+    if (err.status === 403) {
+      return res.status(403).json({ success: false, code: 'FORBIDDEN', message: err.message });
+    }
+    next(err);
+  }
+};
+
+/**
+ * POST /api/v1/apps/:id/apk/upload-url
+ * Generate a direct-to-cloud presigned URL to bypass the Render 100-second timeout.
+ */
+export const generateApkUploadUrl = async (req, res, next) => {
+  try {
+    const app = await resolveAppWithOwnership(req);
+    if (!app) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+
+    const { fileName, fileSize, contentType, versionName, versionCode, releaseNotes } = req.body;
+    if (!fileName || !fileSize) {
+      return res.status(400).json({ success: false, message: 'fileName and fileSize are required' });
+    }
+
+    const versionId = crypto.randomUUID();
+    const quarantineKey = storageService.generateStorageKey(
+      req.user._id.toString(),
+      app._id.toString(),
+      versionId,
+      fileName,
+      'quarantine'
+    );
+
+    const uploadUrl = await storageService.adapter.generateUploadUrl({
+      key: quarantineKey,
+      expiresIn: 3600, // 1 hour to upload
+      contentType: contentType || 'application/vnd.android.package-archive',
+    });
+
+    // Create placeholder AppVersion so the frontend can confirm it later
+    const versionDoc = await AppVersion.create({
+      app: app._id,
+      developer: req.user._id,
+      versionName: versionName || app.version || '1.0.0',
+      versionCode: versionCode ? parseInt(versionCode, 10) : 1,
+      releaseNotes: releaseNotes || 'Uploaded via Direct-to-Cloud Pipeline',
+      fileName: path.basename(quarantineKey),
+      originalFileName: fileName,
+      fileSize,
+      fileHash: 'PENDING_UPLOAD',
+      sha256: 'PENDING_UPLOAD',
+      storageProvider: storageService.providerType,
+      storageKey: quarantineKey,
+      storagePath: `direct://${quarantineKey}`,
+      contentType: contentType || 'application/vnd.android.package-archive',
+      uploadStatus: 'UPLOADING',
+      processingStatus: 'IDLE',
+      securityStatus: 'PENDING_SCAN',
+      downloadStatus: 'DISABLED',
+      quarantined: true,
+      quarantineReason: 'Awaiting direct client upload completion',
+      quarantinedAt: new Date(),
+      quarantinedStorageKey: quarantineKey,
+      isCurrent: true,
+    });
+
+    // Update application record
+    app.currentVersion = versionDoc._id;
+    app.version = versionDoc.versionName;
+    await app.save();
+
+    return res.status(200).json({
+      success: true,
+      uploadUrl,
+      versionId: versionDoc._id,
+      storageKey: quarantineKey,
+    });
+  } catch (err) {
+    if (err.status === 403) {
+      return res.status(403).json({ success: false, code: 'FORBIDDEN', message: err.message });
+    }
+    next(err);
+  }
+};
+
+/**
+ * POST /api/v1/apps/:id/apk/confirm
+ * Confirm that a Direct-to-Cloud upload finished, and trigger the background processing.
+ */
+export const confirmApkUpload = async (req, res, next) => {
+  try {
+    const app = await resolveAppWithOwnership(req);
+    if (!app) {
+      return res.status(404).json({ success: false, message: 'Application not found' });
+    }
+
+    const { versionId } = req.body;
+    if (!versionId) {
+      return res.status(400).json({ success: false, message: 'versionId is required' });
+    }
+
+    const versionDoc = await AppVersion.findOne({ _id: versionId, app: app._id });
+    if (!versionDoc) {
+      return res.status(404).json({ success: false, message: 'Version record not found' });
+    }
+
+    // Set the placeholder hashes back to the background worker format so Validation doesn't fail
+    versionDoc.uploadStatus = 'UPLOADED';
+    versionDoc.processingStatus = 'PROCESSING';
+    versionDoc.quarantineReason = 'Awaiting background processing and security verification';
+    versionDoc.fileHash = 'PENDING_BACKGROUND_HASH';
+    versionDoc.sha256 = 'PENDING_BACKGROUND_HASH';
+    await versionDoc.save();
+
+    // Enqueue background processing
+    await apkQueue.addJob({ versionId: versionDoc._id });
+
+    return res.status(200).json({
+      success: true,
+      message: 'Upload confirmed successfully. Background processing has started.',
+      data: versionDoc,
+      apk: {
+        fileName: versionDoc.originalFileName,
+        version: versionDoc.versionName,
+        versionCode: versionDoc.versionCode,
+        storageKey: versionDoc.storageKey,
+        size: versionDoc.fileSize,
+        quarantined: true,
+        securityStatus: versionDoc.securityStatus,
+        downloadStatus: versionDoc.downloadStatus,
+        uploadedAt: new Date(),
+        apkMetadata: {
+          versionName: versionDoc.versionName,
+          versionCode: versionDoc.versionCode,
+        },
+      }
+    });
   } catch (err) {
     if (err.status === 403) {
       return res.status(403).json({ success: false, code: 'FORBIDDEN', message: err.message });

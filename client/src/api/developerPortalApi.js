@@ -1,3 +1,4 @@
+import axios from 'axios';
 import { apiClient } from './axios';
 
 /**
@@ -157,14 +158,26 @@ export const uploadAppDemoVideo = async (appId, file, onProgress) => {
  * @param {Function} onProgress
  */
 export const uploadAppApk = async (appId, file, data = {}, onProgress) => {
-  const formData = new FormData();
-  formData.append('apk', file);
-  if (data.versionName) formData.append('versionName', data.versionName);
-  if (data.versionCode) formData.append('versionCode', data.versionCode);
-  if (data.releaseNotes) formData.append('releaseNotes', data.releaseNotes);
+  // Step 1: Request a Presigned Upload URL from the Backend
+  const initRes = await apiClient.post(`/apps/${appId}/apk/upload-url`, {
+    fileName: file.name,
+    fileSize: file.size,
+    contentType: file.type || 'application/vnd.android.package-archive',
+    versionName: data.versionName,
+    versionCode: data.versionCode,
+    releaseNotes: data.releaseNotes,
+  });
 
-  return await apiClient.post(`/apps/${appId}/apk`, formData, {
-    headers: { 'Content-Type': 'multipart/form-data' },
+  if (!initRes.uploadUrl) {
+    throw new Error('Failed to retrieve secure upload URL');
+  }
+
+  // Step 2: Upload directly to Cloudflare R2 / Firebase
+  // We use vanilla axios to avoid attaching our JWT Authorization header (which breaks S3/R2 signatures)
+  await axios.put(initRes.uploadUrl, file, {
+    headers: {
+      'Content-Type': file.type || 'application/vnd.android.package-archive',
+    },
     timeout: 0,
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
@@ -172,6 +185,11 @@ export const uploadAppApk = async (appId, file, data = {}, onProgress) => {
         onProgress(percentCompleted, progressEvent.loaded, progressEvent.total);
       }
     },
+  });
+
+  // Step 3: Confirm upload with backend
+  return await apiClient.post(`/apps/${appId}/apk/confirm`, {
+    versionId: initRes.versionId,
   });
 };
 

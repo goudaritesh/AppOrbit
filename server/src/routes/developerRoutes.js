@@ -59,6 +59,8 @@ import {
   uploadScreenshots as uploadScreenshotsHandler,
   uploadDemoVideo as uploadDemoVideoHandler,
   uploadAppApk,
+  generateApkUploadUrl,
+  confirmApkUpload,
   deleteScreenshot,
   deleteMedia,
 } from '../controllers/uploadController.js';
@@ -155,6 +157,16 @@ router.post(
   verifyAppOwnership,
   uploadApkMiddleware,
   uploadAppApk
+);
+router.post(
+  '/apps/:appId/apk/upload-url',
+  verifyAppOwnership,
+  generateApkUploadUrl
+);
+router.post(
+  '/apps/:appId/apk/confirm',
+  verifyAppOwnership,
+  confirmApkUpload
 );
 router.delete('/apps/:appId/screenshots/:screenshotId', verifyAppOwnership, deleteScreenshot);
 router.delete('/apps/:appId/media/:mediaId', verifyAppOwnership, deleteMedia);
