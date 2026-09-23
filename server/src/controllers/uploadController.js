@@ -14,6 +14,7 @@ import { ApkHashService } from '../services/apk/apkHashService.js';
 import { storageService } from '../services/storage/storageService.js';
 import { ApkSecurityPipeline } from '../security/apkSecurityPipeline.js';
 import { apkQueue } from '../workers/apkQueue.js';
+import { globalQuotaService } from '../services/globalQuotaService.js';
 import fs from 'fs';
 
 /**
@@ -244,6 +245,14 @@ export const uploadAppApk = async (req, res, next) => {
     }
 
     const { originalname, size, mimetype, path: tempFilePath } = req.file;
+
+    // 0. Global Storage Quota Check (10 GB Hard Limit)
+    try {
+      await globalQuotaService.checkStorageQuota(size);
+    } catch (err) {
+      fs.unlink(tempFilePath, () => {});
+      return res.status(403).json({ success: false, code: err.code || 'QUOTA_EXCEEDED', message: err.message });
+    }
 
     // 1. Layered APK validation
     const extCheck = ApkValidationService.validateExtension(originalname);
