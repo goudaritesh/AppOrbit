@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import path from 'path';
 import { LocalPrivateStorageAdapter } from './localPrivateStorageAdapter.js';
 import { S3StorageAdapter } from './s3StorageAdapter.js';
+import { FirebaseStorageAdapter } from './firebaseStorageAdapter.js';
 
 /**
  * Storage Service Factory
@@ -13,6 +14,8 @@ class StorageService {
 
     if (this.providerType === 's3' || this.providerType === 'r2') {
       this.adapter = new S3StorageAdapter({ provider: this.providerType });
+    } else if (this.providerType === 'firebase') {
+      this.adapter = new FirebaseStorageAdapter();
     } else {
       this.adapter = new LocalPrivateStorageAdapter();
     }
