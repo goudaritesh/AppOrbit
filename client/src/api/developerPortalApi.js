@@ -95,6 +95,7 @@ export const uploadAppIcon = async (appId, file, onProgress) => {
   formData.append('icon', file);
   return await apiClient.post(`/apps/${appId}/icon`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0, // Disable global 15s timeout for large file uploads
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -117,6 +118,7 @@ export const uploadAppScreenshots = async (appId, files, onProgress) => {
   });
   return await apiClient.post(`/apps/${appId}/screenshots`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -137,6 +139,7 @@ export const uploadAppDemoVideo = async (appId, file, onProgress) => {
   formData.append('video', file);
   return await apiClient.post(`/apps/${appId}/demo-video`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
@@ -162,6 +165,7 @@ export const uploadAppApk = async (appId, file, data = {}, onProgress) => {
 
   return await apiClient.post(`/apps/${appId}/apk`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 0,
     onUploadProgress: (progressEvent) => {
       if (onProgress && progressEvent.total) {
         const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
