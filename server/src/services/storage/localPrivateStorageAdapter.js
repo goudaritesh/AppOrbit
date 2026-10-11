@@ -157,6 +157,15 @@ export class LocalPrivateStorageAdapter {
       return false;
     }
   }
+
+  /**
+   * Generates direct upload URL fallback
+   */
+  async generateUploadUrl() {
+    throw new Error(
+      'Direct-to-Cloud upload requires Cloudflare R2, AWS S3, or Firebase (STORAGE_PROVIDER=r2, s3, or firebase). Please set your cloud storage environment variables.'
+    );
+  }
 }
 
 export default LocalPrivateStorageAdapter;

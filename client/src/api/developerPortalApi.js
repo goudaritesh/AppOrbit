@@ -158,21 +158,32 @@ export const uploadAppDemoVideo = async (appId, file, onProgress) => {
  * @param {Function} onProgress
  */
 export const uploadAppApk = async (appId, file, data = {}, onProgress) => {
-  // Step 1: Request a Presigned Upload URL from the Backend
-  const initRes = await apiClient.post(`/apps/${appId}/apk/upload-url`, {
+  // Step 1: Request a Presigned Upload URL from the Backend (with fallback for route prefixes)
+  let initRes;
+  const payload = {
     fileName: file.name,
     fileSize: file.size,
     contentType: file.type || 'application/vnd.android.package-archive',
     versionName: data.versionName,
     versionCode: data.versionCode,
     releaseNotes: data.releaseNotes,
-  });
+  };
 
-  if (!initRes.uploadUrl) {
+  try {
+    initRes = await apiClient.post(`/apps/${appId}/apk/upload-url`, payload);
+  } catch (err) {
+    if (err.response?.status === 404) {
+      initRes = await apiClient.post(`/developer/apps/${appId}/apk/upload-url`, payload);
+    } else {
+      throw err;
+    }
+  }
+
+  if (!initRes || !initRes.uploadUrl) {
     throw new Error('Failed to retrieve secure upload URL');
   }
 
-  // Step 2: Upload directly to Cloudflare R2 / Firebase
+  // Step 2: Upload directly to Cloudflare R2 / S3 / Firebase
   // We use vanilla axios to avoid attaching our JWT Authorization header (which breaks S3/R2 signatures)
   await axios.put(initRes.uploadUrl, file, {
     headers: {
@@ -188,9 +199,18 @@ export const uploadAppApk = async (appId, file, data = {}, onProgress) => {
   });
 
   // Step 3: Confirm upload with backend
-  return await apiClient.post(`/apps/${appId}/apk/confirm`, {
-    versionId: initRes.versionId,
-  });
+  try {
+    return await apiClient.post(`/apps/${appId}/apk/confirm`, {
+      versionId: initRes.versionId,
+    });
+  } catch (err) {
+    if (err.response?.status === 404) {
+      return await apiClient.post(`/developer/apps/${appId}/apk/confirm`, {
+        versionId: initRes.versionId,
+      });
+    }
+    throw err;
+  }
 };
 
 /**

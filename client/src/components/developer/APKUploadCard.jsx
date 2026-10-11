@@ -85,7 +85,7 @@ export const APKUploadCard = ({
       setStatusText('APK verified and stored successfully!');
       setSelectedFile(null);
       if (onUploadSuccess) {
-        onUploadSuccess(res.data?.apk || res.data?.version);
+        onUploadSuccess(res.apk || res.data?.apk || res.data?.version || res.data);
       }
     } catch (err) {
       console.error('APK upload failed:', err);

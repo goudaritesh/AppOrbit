@@ -137,12 +137,18 @@ export class S3StorageAdapter {
     const { PutObjectCommand } = await import('@aws-sdk/client-s3');
     const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');
 
-    const command = new PutObjectCommand({
+    const putParams = {
       Bucket: this.bucket,
       Key: key,
       ContentType: contentType,
-      ServerSideEncryption: 'AES256',
-    });
+    };
+
+    // Cloudflare R2 automatically encrypts at rest; do not enforce SSE headers for R2
+    if (this.provider === 's3' && process.env.AWS_S3_ENCRYPTION === 'true') {
+      putParams.ServerSideEncryption = 'AES256';
+    }
+
+    const command = new PutObjectCommand(putParams);
 
     return await getSignedUrl(s3, command, { expiresIn });
   }

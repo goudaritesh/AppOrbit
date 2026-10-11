@@ -23,6 +23,8 @@ import {
   uploadScreenshots as uploadScreenshotsHandler,
   uploadDemoVideo as uploadDemoVideoHandler,
   uploadAppApk,
+  generateApkUploadUrl,
+  confirmApkUpload,
   deleteScreenshot,
   deleteMedia,
 } from '../controllers/uploadController.js';
@@ -141,6 +143,23 @@ router.post(
   verifyAppOwnership,
   uploadApk,
   uploadAppApk
+);
+
+// Sprint 3: Direct-to-Cloud Upload Pipeline (bypasses Render 100s proxy timeout)
+router.post(
+  '/:id/apk/upload-url',
+  protect,
+  authorizeRoles('DEVELOPER', 'ADMIN', 'SUPER_ADMIN'),
+  verifyAppOwnership,
+  generateApkUploadUrl
+);
+
+router.post(
+  '/:id/apk/confirm',
+  protect,
+  authorizeRoles('DEVELOPER', 'ADMIN', 'SUPER_ADMIN'),
+  verifyAppOwnership,
+  confirmApkUpload
 );
 
 router.delete(

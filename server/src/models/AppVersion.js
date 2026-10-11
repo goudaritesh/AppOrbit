@@ -72,7 +72,7 @@ const appVersionSchema = new mongoose.Schema(
     },
     storageProvider: {
       type: String,
-      enum: ['local-private', 's3', 'r2'],
+      enum: ['local-private', 's3', 'r2', 'firebase'],
       default: 'local-private',
     },
     storageKey: {
