@@ -61,6 +61,7 @@ import {
   uploadAppApk,
   generateApkUploadUrl,
   confirmApkUpload,
+  handleLocalApkUpload,
   deleteScreenshot,
   deleteMedia,
 } from '../controllers/uploadController.js';
@@ -77,8 +78,8 @@ const upload = multer({
 const router = Router();
 
 /* ==========================================================================
-   0. Signed Capability Token Download Route
-   Allows direct browser/manager download via cryptographically signed token
+   0. Signed Capability Token Download & Local Direct Upload Routes
+   Allows direct browser/manager download and local uploads via cryptographically signed token
    ========================================================================== */
 router.get(
   '/apps/:appId/versions/:versionId/download',
@@ -97,6 +98,10 @@ router.get(
     });
   }
 );
+
+// Signed capability direct binary upload for local development
+router.put('/apps/:appId/apk/upload-local', handleLocalApkUpload);
+router.put('/apk/upload-local', handleLocalApkUpload);
 
 // Strict RBAC Guard: Authenticated session + DEVELOPER (or ADMIN/SUPER_ADMIN) role required
 router.use(protect);

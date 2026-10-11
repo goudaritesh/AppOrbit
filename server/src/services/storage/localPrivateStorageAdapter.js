@@ -159,12 +159,44 @@ export class LocalPrivateStorageAdapter {
   }
 
   /**
-   * Generates direct upload URL fallback
+   * Generates a signed local direct upload URL for local development environments
    */
-  async generateUploadUrl() {
-    throw new Error(
-      'Direct-to-Cloud upload requires Cloudflare R2, AWS S3, or Firebase (STORAGE_PROVIDER=r2, s3, or firebase). Please set your cloud storage environment variables.'
-    );
+  async generateUploadUrl({ key, expiresIn = 3600 }) {
+    const expiresAt = Math.floor(Date.now() / 1000) + expiresIn;
+    const payload = `local-upload|${key}|${expiresAt}`;
+    const token = crypto
+      .createHmac('sha256', this.signingSecret)
+      .update(payload)
+      .digest('hex');
+
+    const baseUrl =
+      process.env.API_URL ||
+      (process.env.RENDER_EXTERNAL_URL
+        ? `${process.env.RENDER_EXTERNAL_URL}/api`
+        : `http://localhost:${process.env.PORT || 5000}/api`);
+
+    return `${baseUrl}/apps/apk/upload-local?key=${encodeURIComponent(key)}&expires=${expiresAt}&token=${token}`;
+  }
+
+  /**
+   * Verify HMAC signature and expiration timestamp for local direct upload
+   */
+  verifyUploadToken({ key, expires, token }) {
+    if (!key || !expires || !token) return false;
+    const now = Math.floor(Date.now() / 1000);
+    if (parseInt(expires, 10) < now) return false;
+
+    const payload = `local-upload|${key}|${expires}`;
+    const expected = crypto
+      .createHmac('sha256', this.signingSecret)
+      .update(payload)
+      .digest('hex');
+
+    try {
+      return crypto.timingSafeEqual(Buffer.from(token), Buffer.from(expected));
+    } catch {
+      return false;
+    }
   }
 }
 

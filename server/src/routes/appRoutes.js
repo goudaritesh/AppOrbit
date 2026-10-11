@@ -25,6 +25,7 @@ import {
   uploadAppApk,
   generateApkUploadUrl,
   confirmApkUpload,
+  handleLocalApkUpload,
   deleteScreenshot,
   deleteMedia,
 } from '../controllers/uploadController.js';
@@ -161,6 +162,10 @@ router.post(
   verifyAppOwnership,
   confirmApkUpload
 );
+
+// Signed HMAC direct binary upload route for local development
+router.put('/apk/upload-local', handleLocalApkUpload);
+router.put('/:id/apk/upload-local', handleLocalApkUpload);
 
 router.delete(
   '/:id/screenshots/:screenshotId',
